@@ -1,0 +1,13 @@
+{
+  "domain": "flight_tracker",
+  "name": "iCal Flight Tracker",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/your-name/flight-tracker",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/your-name/flight-tracker/issues",
+  "requirements": ["icalendar==5.0.14"],
+  "version": "0.1.0"
+}

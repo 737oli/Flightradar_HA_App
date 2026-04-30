@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "iCal Flight Tracker",
+        "description": "Track flights from a private iCal feed.",
+        "data": {
+          "url": "iCal URL",
+          "name": "Name",
+          "api_key": "FlightAware AeroAPI key",
+          "lookahead_days": "Calendar lookahead days",
+          "update_interval_minutes": "Update interval minutes"
+        }
+      }
+    },
+    "error": {
+      "invalid_url": "Enter a valid http or https iCal URL."
+    },
+    "abort": {
+      "already_configured": "This iCal URL is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "iCal Flight Tracker options",
+        "data": {
+          "url": "iCal URL",
+          "name": "Name",
+          "api_key": "FlightAware AeroAPI key",
+          "lookahead_days": "Calendar lookahead days",
+          "update_interval_minutes": "Update interval minutes"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current_flight": {
+        "name": "Current flight"
+      },
+      "next_flight": {
+        "name": "Next flight"
+      },
+      "tracked_flights": {
+        "name": "Tracked flights"
+      }
+    },
+    "device_tracker": {
+      "flight_location": {
+        "name": "Flight location"
+      }
+    }
+  }
+}
+
