@@ -2,31 +2,26 @@
 
 from __future__ import annotations
 
+from inspect import isawaitable
 from pathlib import Path
 
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DOMAIN
-from .coordinator import FlightTrackerCoordinator
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.DEVICE_TRACKER]
+FRONTEND_URL_PATH = "/flight_tracker_static"
+FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up iCal Flight Tracker from a config entry."""
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                "/flight_tracker_static",
-                str(Path(__file__).parent / "frontend"),
-                True,
-            )
-        ]
-    )
+    await _async_register_frontend_path(hass)
+
+    from .coordinator import FlightTrackerCoordinator
 
     session = async_get_clientsession(hass)
     coordinator = FlightTrackerCoordinator(hass, entry, session)
@@ -44,3 +39,31 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
+
+
+async def _async_register_frontend_path(hass: HomeAssistant) -> None:
+    """Register the Lovelace card static path across supported HA versions."""
+    if hass.data.get(FRONTEND_REGISTERED):
+        return
+
+    frontend_path = str(Path(__file__).parent / "frontend")
+
+    try:
+        from homeassistant.components.http import StaticPathConfig as StaticPath
+    except ImportError:
+        StaticPath = None
+
+    if StaticPath is not None and hasattr(hass.http, "async_register_static_paths"):
+        await hass.http.async_register_static_paths(
+            [StaticPath(FRONTEND_URL_PATH, frontend_path, True)]
+        )
+    elif hasattr(hass.http, "async_register_static_path"):
+        result = hass.http.async_register_static_path(
+            FRONTEND_URL_PATH, frontend_path, True
+        )
+        if isawaitable(result):
+            await result
+    else:
+        hass.http.register_static_path(FRONTEND_URL_PATH, frontend_path, True)
+
+    hass.data[FRONTEND_REGISTERED] = True

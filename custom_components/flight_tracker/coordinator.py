@@ -14,11 +14,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import FlightAwareClient, FlightStatus
+from .api import AirFranceKlmClient, FlightStatus
 from .calendar import FlightEvent, parse_flights
 from .const import (
+    CONF_CONSUMER_HOST,
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_CONSUMER_HOST,
     DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
@@ -26,8 +28,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-LIVE_TRACKING_BEFORE_DEPARTURE = timedelta(hours=6)
-LIVE_TRACKING_AFTER_ARRIVAL = timedelta(hours=6)
+LIVE_TRACKING_BEFORE_DEPARTURE = timedelta(hours=1)
+LIVE_TRACKING_AFTER_ARRIVAL = timedelta(hours=1)
 
 
 @dataclass(frozen=True)
@@ -132,19 +134,26 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         if not candidates:
             return {}
 
-        client = FlightAwareClient(self._session, str(api_key))
+        consumer_host = str(
+            _entry_value(self.entry, CONF_CONSUMER_HOST, DEFAULT_CONSUMER_HOST)
+        )
+        client = AirFranceKlmClient(self._session, str(api_key), consumer_host)
         statuses: dict[str, FlightStatus] = {}
         for event in candidates:
             try:
                 status = await client.async_get_status(event)
             except ClientResponseError as err:
                 _LOGGER.warning(
-                    "FlightAware request failed for %s: %s", event.flight_number, err
+                    "Air France-KLM request failed for %s: %s",
+                    event.flight_number,
+                    err,
                 )
                 continue
             except (ClientError, TimeoutError) as err:
                 _LOGGER.warning(
-                    "FlightAware request failed for %s: %s", event.flight_number, err
+                    "Air France-KLM request failed for %s: %s",
+                    event.flight_number,
+                    err,
                 )
                 continue
 
@@ -157,7 +166,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
 def _current_flight(flights: list[FlightEvent], now: datetime) -> FlightEvent | None:
     """Return the flight whose travel window is active."""
     for flight in flights:
-        if flight.start - timedelta(hours=2) <= now <= flight.end + timedelta(hours=2):
+        if _in_live_window(flight, now):
             return flight
     return None
 
@@ -179,24 +188,23 @@ def _live_candidates(
     """Pick a small set of flights to enrich with live API data."""
     candidates: list[FlightEvent] = []
     for flight in flights:
-        if (
-            flight.start - LIVE_TRACKING_BEFORE_DEPARTURE
-            <= now
-            <= flight.end + LIVE_TRACKING_AFTER_ARRIVAL
-        ):
+        if _in_live_window(flight, now):
             candidates.append(flight)
 
     for flight in (current_flight, next_flight):
-        if (
-            flight
-            and flight not in candidates
-            and flight.start - LIVE_TRACKING_BEFORE_DEPARTURE
-            <= now
-            <= flight.end + LIVE_TRACKING_AFTER_ARRIVAL
-        ):
+        if flight and flight not in candidates and _in_live_window(flight, now):
             candidates.append(flight)
 
     return candidates[:2]
+
+
+def _in_live_window(flight: FlightEvent, now: datetime) -> bool:
+    """Return whether a flight is inside the live status polling window."""
+    return (
+        flight.start - LIVE_TRACKING_BEFORE_DEPARTURE
+        <= now
+        <= flight.end + LIVE_TRACKING_AFTER_ARRIVAL
+    )
 
 
 def _entry_value(entry: ConfigEntry, key: str, default: object) -> object:

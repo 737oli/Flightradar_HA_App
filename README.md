@@ -2,7 +2,7 @@
 
 A custom Home Assistant integration that reads flights from an iCal calendar and exposes the current trip as Home Assistant entities.
 
-The goal is simple: keep the calendar as the source of truth, then let someone at home see your next flight, your current flight window, and live aircraft position when a FlightAware AeroAPI key is configured.
+The goal is simple: keep the calendar as the source of truth, then let someone at home see your next flight, your current flight window, and live aircraft position when an Air France-KLM Open Data API key is configured.
 
 The current parser is tuned for KLC-style roster events such as `KL1327 AMS-KRK` and `DH/KL1978 DBV-AMS`, while still accepting more generic calendar text such as `KL 643 AMS to JFK`.
 
@@ -14,7 +14,7 @@ The current parser is tuned for KLC-style roster events such as `KL1327 AMS-KRK`
 - `device_tracker.<name>_flight_location`
 - A Lovelace custom card at `/flight_tracker_static/flight-tracker-card.js`
 
-The `device_tracker` entity only has GPS coordinates when live position data is available from FlightAware. Without an API key, the integration still works as a calendar-based trip tracker.
+The `device_tracker` entity only has GPS coordinates when live trajectory data is available from the Air France-KLM Flight Status API. Live status is requested from one hour before scheduled departure until one hour after scheduled arrival. Without an API key, the integration still works as a calendar-based trip tracker.
 
 ## Installation
 
@@ -28,7 +28,7 @@ The `device_tracker` entity only has GPS coordinates when live position data is 
 3. Go to **Settings -> Devices & services -> Add integration**.
 4. Search for **iCal Flight Tracker**.
 5. Enter your private KLC roster iCal URL.
-6. Optionally enter a FlightAware AeroAPI key for live flight status and aircraft position.
+6. Optionally enter an Air France-KLM Open Data API key for live flight status, gates, terminals, aircraft details, and trajectory position.
 
 ## Dashboard Card
 
@@ -91,14 +91,18 @@ cards:
     hours_to_show: 12
 ```
 
-## FlightAware Notes
+## Air France-KLM API Notes
 
-FlightAware AeroAPI is optional and usage-based. This integration limits live enrichment to flights that are close to the current time so it does not repeatedly query every future calendar event.
+The Air France-KLM Flight Status API is optional. This integration limits live enrichment to flights that are close to the current time so it does not repeatedly query every future calendar event.
 
 Relevant endpoints:
 
-- `GET /flights/{ident}`
-- `GET /flights/{id}/position`
+- `GET https://api.airfranceklm.com/opendata/flightstatus/v4/flights`
+- `GET https://api.airfranceklm.com/opendata/flightstatus/v4/flights/{flightId}`
+
+The integration sends your API key in the `API-Key` header and uses `KL` as the default consumer host. You can switch the consumer host to `AF` in the integration options.
+
+Live attributes include actual/estimated departure and arrival times, terminal/gate, aircraft registration, `typeCode`, and AF-KLM irregularity details such as delay duration, delay reason, and delay code. The bundled card treats delays of 5 minutes or less as on time and marks later positive delays in red.
 
 ## Development
 

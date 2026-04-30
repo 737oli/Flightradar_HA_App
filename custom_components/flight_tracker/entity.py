@@ -28,29 +28,48 @@ def flight_attributes(
     attrs: dict[str, Any] = {ATTR_LAST_REFRESH: last_refresh.isoformat()}
     if event:
         attrs.update(event.as_attributes())
+        if event.aircraft_type:
+            attrs["calendar_aircraft_type"] = event.aircraft_type
         attrs["minutes_until_departure"] = round(
             (event.start - last_refresh).total_seconds() / 60
         )
     if status:
-        attrs.update(
-            {
-                "live_source": status.source,
-                "live_status": status.status,
-                "flightaware_id": status.fa_flight_id,
-                "actual_departure": _isoformat(status.actual_departure),
-                "estimated_departure": _isoformat(status.estimated_departure),
-                "actual_arrival": _isoformat(status.actual_arrival),
-                "estimated_arrival": _isoformat(status.estimated_arrival),
-                "departure_delay_minutes": status.departure_delay_minutes,
-                "arrival_delay_minutes": status.arrival_delay_minutes,
-                "latitude": status.latitude,
-                "longitude": status.longitude,
-                "altitude_ft": status.altitude_ft,
-                "groundspeed_kt": status.groundspeed_kt,
-                "progress_percent": status.progress_percent,
-                "position_time": _isoformat(status.position_time),
-            }
-        )
+        live_attrs = {
+            "live_source": status.source,
+            "live_status": status.status,
+            "live_flight_id": status.provider_flight_id,
+            "afkl_flight_id": status.provider_flight_id,
+            "actual_departure": _isoformat(status.actual_departure),
+            "estimated_departure": _isoformat(status.estimated_departure),
+            "actual_arrival": _isoformat(status.actual_arrival),
+            "estimated_arrival": _isoformat(status.estimated_arrival),
+            "departure_delay_minutes": status.departure_delay_minutes,
+            "arrival_delay_minutes": status.arrival_delay_minutes,
+            "departure_terminal": status.departure_terminal,
+            "departure_gate": status.departure_gate,
+            "arrival_terminal": status.arrival_terminal,
+            "arrival_gate": status.arrival_gate,
+            "aircraft_registration": status.aircraft_registration,
+            "live_aircraft_type": status.aircraft_type,
+            "irregularity_delay_code": status.delay_code,
+            "irregularity_delay_sub_code": status.delay_sub_code,
+            "irregularity_delay_duration": status.delay_duration,
+            "irregularity_delay_duration_public": status.delay_duration_public,
+            "irregularity_delay_reason": status.delay_reason,
+            "irregularity_delay_reason_public": status.delay_reason_public,
+            "irregularity_delay_reason_code_public": status.delay_reason_code_public,
+            "irregularity_public_disruption_reason": status.public_disruption_reason,
+            "latitude": status.latitude,
+            "longitude": status.longitude,
+            "altitude_ft": status.altitude_ft,
+            "groundspeed_kt": status.groundspeed_kt,
+            "progress_percent": status.progress_percent,
+            "position_time": _isoformat(status.position_time),
+        }
+        if status.aircraft_type:
+            live_attrs["aircraft_type"] = status.aircraft_type
+            live_attrs["aircraft_type_code"] = status.aircraft_type
+        attrs.update(live_attrs)
     return attrs
 
 

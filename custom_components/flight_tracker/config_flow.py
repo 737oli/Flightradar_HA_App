@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import urlparse
 
 import voluptuous as vol
@@ -11,13 +12,20 @@ from homeassistant.const import CONF_API_KEY, CONF_NAME, CONF_URL
 from homeassistant.core import callback
 
 from .const import (
+    CONF_CONSUMER_HOST,
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_CONSUMER_HOST,
     DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_NAME,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
 )
+
+CONSUMER_HOST_OPTIONS = {
+    "KL": "KLM",
+    "AF": "Air France",
+}
 
 
 class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -26,8 +34,8 @@ class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(
-        self, user_input: dict[str, str] | None = None
-    ) -> config_entries.ConfigFlowResult:
+        self, user_input: dict[str, Any] | None = None
+    ):
         """Handle the initial step."""
         errors: dict[str, str] = {}
 
@@ -39,7 +47,7 @@ class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(url)
                 self._abort_if_unique_id_configured()
 
-                data = {
+                data: dict[str, Any] = {
                     CONF_NAME: user_input.get(CONF_NAME, DEFAULT_NAME).strip()
                     or DEFAULT_NAME,
                     CONF_URL: url,
@@ -48,6 +56,9 @@ class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     CONF_UPDATE_INTERVAL: user_input.get(
                         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
+                    ),
+                    CONF_CONSUMER_HOST: _normalize_consumer_host(
+                        user_input.get(CONF_CONSUMER_HOST, DEFAULT_CONSUMER_HOST)
                     ),
                 }
                 if api_key := user_input.get(CONF_API_KEY):
@@ -65,7 +76,7 @@ class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> FlightTrackerOptionsFlow:
+    ):
         """Create the options flow."""
         return FlightTrackerOptionsFlow(config_entry)
 
@@ -78,8 +89,8 @@ class FlightTrackerOptionsFlow(config_entries.OptionsFlow):
         self._config_entry = config_entry
 
     async def async_step_init(
-        self, user_input: dict[str, str] | None = None
-    ) -> config_entries.ConfigFlowResult:
+        self, user_input: dict[str, Any] | None = None
+    ):
         """Manage options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -106,6 +117,12 @@ def _schema(defaults: dict[str, object] | None) -> vol.Schema:
                 default=defaults.get(CONF_API_KEY, ""),
             ): str,
             vol.Optional(
+                CONF_CONSUMER_HOST,
+                default=_normalize_consumer_host(
+                    defaults.get(CONF_CONSUMER_HOST, DEFAULT_CONSUMER_HOST)
+                ),
+            ): vol.In(CONSUMER_HOST_OPTIONS),
+            vol.Optional(
                 CONF_LOOKAHEAD_DAYS,
                 default=defaults.get(CONF_LOOKAHEAD_DAYS, DEFAULT_LOOKAHEAD_DAYS),
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=365)),
@@ -124,3 +141,10 @@ def _valid_url(url: str) -> bool:
     parsed = urlparse(url)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
+
+def _normalize_consumer_host(value: object) -> str:
+    """Normalize the AF-KLM consumer host."""
+    normalized = str(value).strip().upper()
+    if normalized in CONSUMER_HOST_OPTIONS:
+        return normalized
+    return DEFAULT_CONSUMER_HOST

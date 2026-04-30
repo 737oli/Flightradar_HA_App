@@ -7,7 +7,8 @@
         "data": {
           "url": "iCal URL",
           "name": "Name",
-          "api_key": "FlightAware AeroAPI key",
+          "api_key": "Air France-KLM Open Data API key",
+          "consumer_host": "Air France-KLM consumer host",
           "lookahead_days": "Calendar lookahead days",
           "update_interval_minutes": "Update interval minutes"
         }
@@ -27,7 +28,8 @@
         "data": {
           "url": "iCal URL",
           "name": "Name",
-          "api_key": "FlightAware AeroAPI key",
+          "api_key": "Air France-KLM Open Data API key",
+          "consumer_host": "Air France-KLM consumer host",
           "lookahead_days": "Calendar lookahead days",
           "update_interval_minutes": "Update interval minutes"
         }
@@ -53,4 +55,3 @@
     }
   }
 }
-

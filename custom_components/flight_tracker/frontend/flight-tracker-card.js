@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.1";
 const EMPTY_STATES = new Set(["unknown", "unavailable", "none", "not_flying"]);
 
 class FlightTrackerCard extends HTMLElement {
@@ -58,25 +58,46 @@ class FlightTrackerCard extends HTMLElement {
     const now = Date.now();
     const scheduledDeparture = parseDate(attrs.scheduled_departure);
     const scheduledArrival = parseDate(attrs.scheduled_arrival);
-    const departure = parseDate(attrs.estimated_departure) || scheduledDeparture;
-    const arrival = parseDate(attrs.estimated_arrival) || scheduledArrival;
-    const progress = progressPercent(attrs.progress_percent, scheduledDeparture, arrival, now);
-    const timeline = timelineText(scheduledDeparture, arrival, now);
-    const departureStatus = statusText(attrs.departure_delay_minutes);
-    const arrivalStatus = statusText(attrs.arrival_delay_minutes);
+    const departure =
+      parseDate(attrs.actual_departure) ||
+      parseDate(attrs.estimated_departure) ||
+      scheduledDeparture;
+    const arrival =
+      parseDate(attrs.actual_arrival) ||
+      parseDate(attrs.estimated_arrival) ||
+      scheduledArrival;
+    const progress = progressPercent(attrs.progress_percent, departure, arrival, now);
+    const timeline = timelineText(departure, arrival, now);
+    const departureStatus = airportStatus(
+      attrs.departure_terminal,
+      attrs.departure_gate,
+      statusText(attrs.departure_delay_minutes),
+    );
+    const arrivalStatus = airportStatus(
+      attrs.arrival_terminal,
+      attrs.arrival_gate,
+      statusText(attrs.arrival_delay_minutes),
+    );
     const airline = attrs.airline_code || flightPrefix(attrs.flight_number) || "";
     const flightNumber = attrs.flight_number || state.state || "Flight";
     const departureAirport = attrs.departure_airport || routePart(attrs.route, 0) || "---";
     const arrivalAirport = attrs.arrival_airport || routePart(attrs.route, 1) || "---";
-    const aircraft = attrs.aircraft_type || "";
+    const aircraft = attrs.aircraft_type_code || attrs.live_aircraft_type || attrs.aircraft_type || "";
+    const registration = attrs.aircraft_registration || "";
     const label = attrs.is_deadhead ? "Deadhead" : aircraft || airline || "Flight";
-    const rightLabel = attrs.live_status || (attrs.is_deadhead ? "Positioning" : "On roster");
+    const liveStatus = attrs.live_status || (attrs.is_deadhead ? "Positioning" : "On roster");
+    const rightLabel = [registration, liveStatus].filter(Boolean).join(" · ");
+    const irregularity = irregularityText(attrs);
+    const delayClass =
+      isDelayed(attrs.departure_delay_minutes) || isDelayed(attrs.arrival_delay_minutes)
+        ? "is-delayed"
+        : "";
     const phaseClass = timeline.phase === "arrival" ? "is-active" : "";
 
     this.shadowRoot.innerHTML = `
       ${styles()}
       <ha-card>
-        <article class="flight-card ${phaseClass}" aria-label="${escapeHtml(flightNumber)}">
+        <article class="flight-card ${phaseClass} ${delayClass}" aria-label="${escapeHtml(flightNumber)}">
           <div class="glow"></div>
           <header class="meta">
             <span class="airline">
@@ -87,7 +108,7 @@ class FlightTrackerCard extends HTMLElement {
           </header>
 
           <section class="route">
-            <div class="airport origin">
+            <div class="airport origin ${delayTone(attrs.departure_delay_minutes)}">
               <div>
                 <strong>${escapeHtml(departureAirport)}</strong>
                 <span>${formatTime(departure)}</span>
@@ -101,7 +122,7 @@ class FlightTrackerCard extends HTMLElement {
               <span></span>
             </div>
 
-            <div class="airport destination">
+            <div class="airport destination ${delayTone(attrs.arrival_delay_minutes)}">
               <div>
                 <span>${formatTime(arrival)}</span>
                 <strong>${escapeHtml(arrivalAirport)}</strong>
@@ -120,9 +141,15 @@ class FlightTrackerCard extends HTMLElement {
             </div>
           </section>
 
+          ${
+            irregularity
+              ? `<section class="irregularity"><b>Delay</b><span>${escapeHtml(irregularity)}</span></section>`
+              : ""
+          }
+
           <footer class="footer">
             <span>${escapeHtml(flightNumber)}</span>
-            <span>${escapeHtml(attrs.route || `${departureAirport} -> ${arrivalAirport}`)}</span>
+            <span>${escapeHtml(aircraftMeta(registration, aircraft, attrs.route || `${departureAirport} -> ${arrivalAirport}`))}</span>
           </footer>
         </article>
       </ha-card>
@@ -136,6 +163,7 @@ function styles() {
       :host {
         display: block;
         --flight-card-green: #00f58a;
+        --flight-card-red: #ff4d5f;
         --flight-card-muted: rgba(255, 255, 255, 0.62);
         --flight-card-border: rgba(255, 255, 255, 0.12);
       }
@@ -167,6 +195,14 @@ function styles() {
           radial-gradient(circle at 84% 10%, rgba(121, 93, 255, 0.38), transparent 32%),
           radial-gradient(circle at 64% 96%, rgba(0, 245, 138, 0.34), transparent 45%),
           linear-gradient(160deg, #08070b 0%, #1b1323 58%, #07090a 100%);
+      }
+
+      .flight-card.is-delayed {
+        border-color: rgba(255, 77, 95, 0.28);
+        background:
+          radial-gradient(circle at 82% 12%, rgba(255, 77, 95, 0.24), transparent 30%),
+          radial-gradient(circle at 64% 106%, rgba(0, 245, 138, 0.22), transparent 42%),
+          linear-gradient(156deg, #060506 0%, #1b1018 54%, #080707 100%);
       }
 
       .glow {
@@ -282,6 +318,11 @@ function styles() {
         white-space: nowrap;
       }
 
+      .airport.delayed span,
+      .airport.delayed small {
+        color: var(--flight-card-red);
+      }
+
       .plane-line {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
@@ -344,6 +385,37 @@ function styles() {
         font-weight: 700;
         letter-spacing: 0;
         text-transform: uppercase;
+      }
+
+      .irregularity {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 14px;
+        overflow: hidden;
+        color: #ffd8dd;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .irregularity b {
+        flex: 0 0 auto;
+        padding: 4px 8px;
+        border-radius: 999px;
+        color: #1d070a;
+        background: var(--flight-card-red);
+        font-size: 11px;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .irregularity span {
+        overflow: hidden;
+        min-width: 0;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .footer {
@@ -455,10 +527,115 @@ function formatTime(date) {
 
 function statusText(delay) {
   const value = Number(delay);
-  if (!Number.isFinite(value) || Math.abs(value) < 3) {
+  if (!Number.isFinite(value) || Math.abs(value) <= 5) {
     return "On Time";
   }
   return value > 0 ? `${value}m Late` : `${Math.abs(value)}m Early`;
+}
+
+function delayTone(delay) {
+  return isDelayed(delay) ? "delayed" : "on-time";
+}
+
+function isDelayed(delay) {
+  const value = Number(delay);
+  return Number.isFinite(value) && value > 5;
+}
+
+function airportStatus(terminal, gate, status) {
+  const parts = [];
+  if (terminal) {
+    parts.push(String(terminal).startsWith("T") ? terminal : `T${terminal}`);
+  }
+  if (gate) {
+    parts.push(`Gate ${gate}`);
+  }
+  parts.push(status);
+  return parts.join(" · ");
+}
+
+function irregularityText(attrs) {
+  const code = firstValue(
+    attrs.irregularity_delay_code,
+    attrs.irregularity_delay_reason_code_public,
+    attrs.irregularity_delay_sub_code,
+  );
+  const duration =
+    formatDelayDuration(
+      firstValue(
+        attrs.irregularity_delay_duration_public,
+        attrs.irregularity_delay_duration,
+      ),
+    ) || delayDurationFromMinutes(attrs.departure_delay_minutes, attrs.arrival_delay_minutes);
+  const reason = firstValue(
+    attrs.irregularity_delay_reason_public,
+    attrs.irregularity_public_disruption_reason,
+    attrs.irregularity_delay_reason,
+  );
+
+  if (!code && !duration && !reason) {
+    return "";
+  }
+
+  const parts = [duration ? `Delayed ${duration}` : "Delayed"];
+  if (reason) {
+    parts.push(reason);
+  }
+  if (code) {
+    parts.push(`Code ${code}`);
+  }
+  return parts.join(" · ");
+}
+
+function firstValue(...values) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim());
+}
+
+function formatDelayDuration(value) {
+  if (!value) {
+    return "";
+  }
+  const text = String(value).trim();
+  const isoMatch = text.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+  if (isoMatch) {
+    return minutesLabel(Number(isoMatch[1] || 0) * 60 + Number(isoMatch[2] || 0));
+  }
+  const clockMatch = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (clockMatch) {
+    return minutesLabel(Number(clockMatch[1]) * 60 + Number(clockMatch[2]));
+  }
+  if (/^\d+$/.test(text)) {
+    return minutesLabel(Number(text));
+  }
+  return text;
+}
+
+function delayDurationFromMinutes(...delays) {
+  const minutes = Math.max(
+    0,
+    ...delays
+      .map((delay) => Number(delay))
+      .filter((delay) => Number.isFinite(delay) && delay > 5),
+  );
+  return minutes ? minutesLabel(minutes) : "";
+}
+
+function minutesLabel(totalMinutes) {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours && remainder) {
+    return `${hours}h ${remainder}m`;
+  }
+  if (hours) {
+    return `${hours}h`;
+  }
+  return `${remainder}m`;
+}
+
+function aircraftMeta(registration, aircraft, route) {
+  const parts = [registration, aircraft, route].filter(Boolean);
+  return parts.length ? parts.join(" · ") : route;
 }
 
 function progressPercent(apiProgress, departure, arrival, now) {
