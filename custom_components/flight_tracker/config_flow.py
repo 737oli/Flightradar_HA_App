@@ -22,11 +22,6 @@ from .const import (
     DOMAIN,
 )
 
-CONSUMER_HOST_OPTIONS = {
-    "KL": "KLM",
-    "AF": "Air France",
-}
-
 
 class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle an iCal Flight Tracker config flow."""
@@ -40,30 +35,18 @@ class FlightTrackerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            url = user_input[CONF_URL].strip()
+            url = str(user_input[CONF_URL]).strip()
+            api_key = str(user_input.get(CONF_API_KEY, "")).strip()
             if not _valid_url(url):
                 errors[CONF_URL] = "invalid_url"
-            else:
+            if not api_key:
+                errors[CONF_API_KEY] = "api_key_required"
+
+            if not errors:
                 await self.async_set_unique_id(url)
                 self._abort_if_unique_id_configured()
 
-                data: dict[str, Any] = {
-                    CONF_NAME: user_input.get(CONF_NAME, DEFAULT_NAME).strip()
-                    or DEFAULT_NAME,
-                    CONF_URL: url,
-                    CONF_LOOKAHEAD_DAYS: user_input.get(
-                        CONF_LOOKAHEAD_DAYS, DEFAULT_LOOKAHEAD_DAYS
-                    ),
-                    CONF_UPDATE_INTERVAL: user_input.get(
-                        CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
-                    ),
-                    CONF_CONSUMER_HOST: _normalize_consumer_host(
-                        user_input.get(CONF_CONSUMER_HOST, DEFAULT_CONSUMER_HOST)
-                    ),
-                }
-                if api_key := user_input.get(CONF_API_KEY):
-                    data[CONF_API_KEY] = api_key.strip()
-
+                data = _entry_data(user_input)
                 return self.async_create_entry(title=data[CONF_NAME], data=data)
 
         return self.async_show_form(
@@ -92,11 +75,23 @@ class FlightTrackerOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ):
         """Manage options."""
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            if not _valid_url(str(user_input[CONF_URL]).strip()):
+                errors[CONF_URL] = "invalid_url"
+            if not str(user_input.get(CONF_API_KEY, "")).strip():
+                errors[CONF_API_KEY] = "api_key_required"
+
+            if not errors:
+                return self.async_create_entry(title="", data=_entry_data(user_input))
 
         data = {**self._config_entry.data, **self._config_entry.options}
-        return self.async_show_form(step_id="init", data_schema=_schema(data))
+        return self.async_show_form(
+            step_id="init",
+            data_schema=_schema(user_input or data),
+            errors=errors,
+        )
 
 
 def _schema(defaults: dict[str, object] | None) -> vol.Schema:
@@ -112,16 +107,10 @@ def _schema(defaults: dict[str, object] | None) -> vol.Schema:
                 CONF_NAME,
                 default=defaults.get(CONF_NAME, DEFAULT_NAME),
             ): str,
-            vol.Optional(
+            vol.Required(
                 CONF_API_KEY,
                 default=defaults.get(CONF_API_KEY, ""),
             ): str,
-            vol.Optional(
-                CONF_CONSUMER_HOST,
-                default=_normalize_consumer_host(
-                    defaults.get(CONF_CONSUMER_HOST, DEFAULT_CONSUMER_HOST)
-                ),
-            ): vol.In(CONSUMER_HOST_OPTIONS),
             vol.Optional(
                 CONF_LOOKAHEAD_DAYS,
                 default=defaults.get(CONF_LOOKAHEAD_DAYS, DEFAULT_LOOKAHEAD_DAYS),
@@ -142,9 +131,18 @@ def _valid_url(url: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-def _normalize_consumer_host(value: object) -> str:
-    """Normalize the AF-KLM consumer host."""
-    normalized = str(value).strip().upper()
-    if normalized in CONSUMER_HOST_OPTIONS:
-        return normalized
-    return DEFAULT_CONSUMER_HOST
+def _entry_data(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Return normalized config entry data."""
+    return {
+        CONF_NAME: str(user_input.get(CONF_NAME, DEFAULT_NAME)).strip()
+        or DEFAULT_NAME,
+        CONF_URL: str(user_input[CONF_URL]).strip(),
+        CONF_API_KEY: str(user_input[CONF_API_KEY]).strip(),
+        CONF_CONSUMER_HOST: DEFAULT_CONSUMER_HOST,
+        CONF_LOOKAHEAD_DAYS: user_input.get(
+            CONF_LOOKAHEAD_DAYS, DEFAULT_LOOKAHEAD_DAYS
+        ),
+        CONF_UPDATE_INTERVAL: user_input.get(
+            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
+        ),
+    }

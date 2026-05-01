@@ -1,4 +1,4 @@
-"""Optional live flight data providers."""
+"""Live Air France-KLM flight data provider."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from aiohttp import ClientSession
 
 AFKL_BASE_URL = "https://api.airfranceklm.com/opendata/flightstatus/v4"
+KLM_CARRIER_CODE = "KL"
 
 
 @dataclass(frozen=True)
@@ -68,16 +69,26 @@ class AirFranceKlmClient:
     """Small Air France-KLM Open Data Flight Status API client."""
 
     def __init__(
-        self, session: ClientSession, api_key: str, consumer_host: str = "KL"
+        self,
+        session: ClientSession,
+        api_key: str,
+        consumer_host: str = KLM_CARRIER_CODE,
     ) -> None:
         """Initialize the client."""
         self._session = session
         self._api_key = api_key
-        self._consumer_host = consumer_host
+        normalized_host = str(consumer_host).strip().upper()
+        self._consumer_host = (
+            normalized_host
+            if normalized_host == KLM_CARRIER_CODE
+            else KLM_CARRIER_CODE
+        )
 
     async def async_get_status(self, event: FlightEvent) -> FlightStatus | None:
         """Fetch live status for a calendar flight."""
         if not event.flight_number or not event.airline_code:
+            return None
+        if event.airline_code.upper() != KLM_CARRIER_CODE:
             return None
 
         data = await self._request(
@@ -90,7 +101,7 @@ class AirFranceKlmClient:
                 "timeType": "U",
                 "origin": event.departure_airport,
                 "destination": event.arrival_airport,
-                "carrierCode": event.airline_code,
+                "carrierCode": KLM_CARRIER_CODE,
                 "flightNumber": _numeric_flight_number(event.flight_number),
                 "pageSize": 10,
                 "pageNumber": 0,

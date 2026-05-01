@@ -14,8 +14,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import ATTR_FLIGHTS, DOMAIN
 from .coordinator import FlightTrackerCoordinator
 from .entity import async_coordinator, compact_flight, flight_attributes
+from .summary import TravelStatusSummary, build_travel_status
 
 SENSOR_DESCRIPTIONS = (
+    SensorEntityDescription(
+        key="travel_status",
+        translation_key="travel_status",
+        icon="mdi:account-heart",
+    ),
     SensorEntityDescription(
         key="current_flight",
         translation_key="current_flight",
@@ -74,6 +80,9 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
     def native_value(self) -> str | int | None:
         """Return the state value."""
         data = self.coordinator.data
+        if self.entity_description.key == "travel_status":
+            return _travel_status(data).native_value
+
         if self.entity_description.key == "tracked_flights":
             return len(data.flights)
 
@@ -98,6 +107,11 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return sensor attributes."""
         data = self.coordinator.data
+        if self.entity_description.key == "travel_status":
+            attrs = _travel_status_attributes(_travel_status(data))
+            attrs["last_refresh"] = data.last_refresh.isoformat()
+            return attrs
+
         if self.entity_description.key == "tracked_flights":
             return {
                 ATTR_FLIGHTS: [compact_flight(flight) for flight in data.flights],
@@ -111,3 +125,37 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
         )
         return flight_attributes(event, data.status_for(event), data.last_refresh)
 
+
+def _travel_status(data) -> TravelStatusSummary:
+    """Return the current friendly travel status."""
+    return build_travel_status(
+        data.current_flight,
+        data.next_flight,
+        data.status_for(data.current_flight),
+        data.status_for(data.next_flight),
+        data.last_refresh,
+    )
+
+
+def _travel_status_attributes(summary: TravelStatusSummary) -> dict[str, Any]:
+    """Return Home Assistant attributes for a travel summary."""
+    return {
+        "phase": summary.phase,
+        "headline": summary.headline,
+        "detail": summary.detail,
+        "notification_title": summary.notification_title,
+        "notification_message": summary.notification_message,
+        "notification_key": summary.notification_key,
+        "severity": summary.severity,
+        "event_uid": summary.event_uid,
+        "flight_number": summary.flight_number,
+        "route": summary.route,
+        "destination": summary.destination,
+        "minutes_until_departure": summary.minutes_until_departure,
+        "minutes_until_arrival": summary.minutes_until_arrival,
+        "max_delay_minutes": summary.max_delay_minutes,
+        "is_active": summary.is_active,
+        "is_airborne": summary.is_airborne,
+        "is_arriving_soon": summary.is_arriving_soon,
+        "is_delayed": summary.is_delayed,
+    }

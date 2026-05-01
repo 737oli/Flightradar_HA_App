@@ -3,19 +3,19 @@
     "step": {
       "user": {
         "title": "iCal Flight Tracker",
-        "description": "Track flights from a private iCal feed.",
+        "description": "Track KLM flights from a private iCal feed. An Air France-KLM API key is required.",
         "data": {
           "url": "iCal URL",
           "name": "Name",
           "api_key": "Air France-KLM Open Data API key",
-          "consumer_host": "Air France-KLM consumer host",
           "lookahead_days": "Calendar lookahead days",
           "update_interval_minutes": "Update interval minutes"
         }
       }
     },
     "error": {
-      "invalid_url": "Enter a valid http or https iCal URL."
+      "invalid_url": "Enter a valid http or https iCal URL.",
+      "api_key_required": "Enter your Air France-KLM Open Data API key."
     },
     "abort": {
       "already_configured": "This iCal URL is already configured."
@@ -29,15 +29,21 @@
           "url": "iCal URL",
           "name": "Name",
           "api_key": "Air France-KLM Open Data API key",
-          "consumer_host": "Air France-KLM consumer host",
           "lookahead_days": "Calendar lookahead days",
           "update_interval_minutes": "Update interval minutes"
         }
       }
+    },
+    "error": {
+      "invalid_url": "Enter a valid http or https iCal URL.",
+      "api_key_required": "Enter your Air France-KLM Open Data API key."
     }
   },
   "entity": {
     "sensor": {
+      "travel_status": {
+        "name": "Travel status"
+      },
       "current_flight": {
         "name": "Current flight"
       },
@@ -46,6 +52,23 @@
       },
       "tracked_flights": {
         "name": "Tracked flights"
+      }
+    },
+    "binary_sensor": {
+      "flight_active": {
+        "name": "Flight active"
+      },
+      "flight_airborne": {
+        "name": "Flight airborne"
+      },
+      "flight_arriving_soon": {
+        "name": "Flight arriving soon"
+      },
+      "flight_delayed": {
+        "name": "Flight delayed"
+      },
+      "flight_landed": {
+        "name": "Flight landed"
       }
     },
     "device_tracker": {

@@ -17,7 +17,6 @@ from homeassistant.util import dt as dt_util
 from .api import AirFranceKlmClient, FlightStatus
 from .calendar import FlightEvent, parse_flights
 from .const import (
-    CONF_CONSUMER_HOST,
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
     DEFAULT_CONSUMER_HOST,
@@ -50,7 +49,7 @@ class FlightTrackerSnapshot:
 
 
 class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
-    """Fetch and coordinate iCal and optional live flight data."""
+    """Fetch and coordinate iCal and live KLM flight data."""
 
     config_entry: ConfigEntry
 
@@ -125,19 +124,18 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         current_flight: FlightEvent | None,
         next_flight: FlightEvent | None,
     ) -> dict[str, FlightStatus]:
-        """Fetch optional live statuses for relevant flights."""
-        api_key = _entry_value(self.entry, CONF_API_KEY, "")
+        """Fetch required live statuses for relevant flights."""
+        api_key = str(_entry_value(self.entry, CONF_API_KEY, "")).strip()
         if not api_key:
-            return {}
+            raise UpdateFailed("Air France-KLM API key is required")
 
         candidates = _live_candidates(flights, now, current_flight, next_flight)
         if not candidates:
             return {}
 
-        consumer_host = str(
-            _entry_value(self.entry, CONF_CONSUMER_HOST, DEFAULT_CONSUMER_HOST)
+        client = AirFranceKlmClient(
+            self._session, api_key, DEFAULT_CONSUMER_HOST
         )
-        client = AirFranceKlmClient(self._session, str(api_key), consumer_host)
         statuses: dict[str, FlightStatus] = {}
         for event in candidates:
             try:

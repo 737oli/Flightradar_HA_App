@@ -10,12 +10,13 @@ from typing import Any
 from icalendar import Calendar
 
 AIRLINE_CODE_PATTERN = r"(?:[A-Z]{2,3}|[A-Z][0-9]|[0-9][A-Z])"
+KLM_AIRLINE_CODE = "KL"
 FLIGHT_NUMBER_RE = re.compile(
-    rf"(?<![A-Z0-9])(({AIRLINE_CODE_PATTERN})\s?\d{{1,4}}[A-Z]?)(?![A-Z0-9])",
+    rf"(?<![A-Z0-9])(({KLM_AIRLINE_CODE})\s?\d{{1,4}}[A-Z]?)(?![A-Z0-9])",
     re.IGNORECASE,
 )
 ROSTER_SUMMARY_RE = re.compile(
-    rf"^(?P<deadhead>DH/)?(?P<flight>(?P<airline>{AIRLINE_CODE_PATTERN})\s?\d{{1,4}}[A-Z]?)\s+"
+    rf"^(?P<deadhead>DH/)?(?P<flight>(?P<airline>{KLM_AIRLINE_CODE})\s?\d{{1,4}}[A-Z]?)\s+"
     r"(?P<departure>[A-Z]{3})\s*[-–—]\s*(?P<arrival>[A-Z]{3})(?:\s|$)",
     re.IGNORECASE,
 )
@@ -90,7 +91,7 @@ def parse_flights(
             continue
         if event.end < start_cutoff or event.start > end_cutoff:
             continue
-        if not event.flight_number:
+        if event.airline_code != KLM_AIRLINE_CODE or not event.flight_number:
             continue
         flights.append(event)
 

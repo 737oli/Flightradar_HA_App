@@ -14,7 +14,7 @@ SPEC.loader.exec_module(calendar_module)
 parse_flights = calendar_module.parse_flights
 
 
-def test_parse_flight_number_and_route_from_summary():
+def test_ignores_non_kl_flight_numbers():
     ics = """BEGIN:VCALENDAR
 VERSION:2.0
 BEGIN:VEVENT
@@ -33,11 +33,7 @@ END:VCALENDAR
         timedelta(days=10),
     )
 
-    assert len(flights) == 1
-    assert flights[0].flight_number == "SN3175"
-    assert flights[0].airline_code == "SN"
-    assert flights[0].departure_airport == "BRU"
-    assert flights[0].arrival_airport == "FCO"
+    assert flights == []
 
 
 def test_parse_flight_number_from_description():

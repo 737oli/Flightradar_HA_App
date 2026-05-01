@@ -202,15 +202,42 @@ def test_afkl_client_uses_v4_flights_endpoint_and_api_key_header():
     )
 
     status = asyncio.run(
-        AirFranceKlmClient(session, "secret-key", "KL").async_get_status(event)
+        AirFranceKlmClient(session, "secret-key", "AF").async_get_status(event)
     )
 
     assert status.provider_flight_id == "20260506+KL+0643"
     assert session.calls[0]["url"] == f"{AFKL_BASE_URL}/flights"
     assert session.calls[0]["headers"]["API-Key"] == "secret-key"
+    assert session.calls[0]["headers"]["afkl-travel-host"] == "KL"
+    assert session.calls[0]["params"]["consumerHost"] == "KL"
     assert session.calls[0]["params"]["carrierCode"] == "KL"
     assert session.calls[0]["params"]["flightNumber"] == "0643"
     assert session.calls[1]["url"] == f"{AFKL_BASE_URL}/flights/20260506%2BKL%2B0643"
+
+
+def test_afkl_client_ignores_non_kl_events():
+    event = FlightEvent(
+        uid="flight-3",
+        summary="AF1341 AMS-CDG",
+        description="",
+        location="",
+        start=datetime(2026, 5, 6, 13, 20, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 6, 15, 10, tzinfo=timezone.utc),
+        flight_number="AF1341",
+        airline_code="AF",
+        departure_airport="AMS",
+        arrival_airport="CDG",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+    session = FakeSession([])
+
+    status = asyncio.run(
+        AirFranceKlmClient(session, "secret-key", "AF").async_get_status(event)
+    )
+
+    assert status is None
+    assert session.calls == []
 
 
 class FakeSession:
