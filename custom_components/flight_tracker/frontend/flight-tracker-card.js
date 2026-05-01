@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.2.1";
+const CARD_VERSION = "0.2.2";
 const EMPTY_STATES = new Set(["unknown", "unavailable", "none", "not_flying"]);
 
 class FlightTrackerCard extends HTMLElement {
@@ -101,7 +101,7 @@ class FlightTrackerCard extends HTMLElement {
           <div class="glow"></div>
           <header class="meta">
             <span class="airline">
-              <span class="airline-dot">${escapeHtml(airline || "FT")}</span>
+              <span class="airline-dot">${escapeHtml(flightNumber)}</span>
               <span>${escapeHtml(label)}</span>
             </span>
             <span class="record">${escapeHtml(rightLabel)}</span>
@@ -146,11 +146,6 @@ class FlightTrackerCard extends HTMLElement {
               ? `<section class="irregularity"><b>Delay</b><span>${escapeHtml(irregularity)}</span></section>`
               : ""
           }
-
-          <footer class="footer">
-            <span>${escapeHtml(flightNumber)}</span>
-            <span>${escapeHtml(aircraftMeta(registration, aircraft, attrs.route || `${departureAirport} -> ${arrivalAirport}`))}</span>
-          </footer>
         </article>
       </ha-card>
     `;
@@ -215,14 +210,12 @@ function styles() {
       }
 
       .meta,
-      .route,
-      .footer {
+      .route {
         position: relative;
         z-index: 1;
       }
 
-      .meta,
-      .footer {
+      .meta {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -246,9 +239,9 @@ function styles() {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 30px;
+        min-width: 54px;
         height: 20px;
-        padding: 0 6px;
+        padding: 0 8px;
         border-radius: 999px;
         color: #07100c;
         background: var(--flight-card-green);
@@ -414,18 +407,6 @@ function styles() {
       .irregularity span {
         overflow: hidden;
         min-width: 0;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .footer {
-        margin-top: 13px;
-        color: rgba(255, 255, 255, 0.58);
-        font-size: 13px;
-      }
-
-      .footer span {
-        overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -631,11 +612,6 @@ function minutesLabel(totalMinutes) {
     return `${hours}h`;
   }
   return `${remainder}m`;
-}
-
-function aircraftMeta(registration, aircraft, route) {
-  const parts = [registration, aircraft, route].filter(Boolean);
-  return parts.length ? parts.join(" · ") : route;
 }
 
 function progressPercent(apiProgress, departure, arrival, now) {
