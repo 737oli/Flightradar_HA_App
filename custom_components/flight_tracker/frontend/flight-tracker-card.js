@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.2.2";
+const CARD_VERSION = "0.3.1";
 const EMPTY_STATES = new Set(["unknown", "unavailable", "none", "not_flying"]);
 
 class FlightTrackerCard extends HTMLElement {
@@ -146,6 +146,76 @@ class FlightTrackerCard extends HTMLElement {
               ? `<section class="irregularity"><b>Delay</b><span>${escapeHtml(irregularity)}</span></section>`
               : ""
           }
+        </article>
+      </ha-card>
+    `;
+  }
+}
+
+class FlightTrackerTimelineCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
+  setConfig(config) {
+    if (!config.entity) {
+      throw new Error("Define entity");
+    }
+
+    this._config = {
+      title: "Where is Olivier today?",
+      ...config,
+    };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  getCardSize() {
+    return 4;
+  }
+
+  static getStubConfig() {
+    return {
+      type: "custom:flight-tracker-timeline-card",
+      entity: "sensor.ical_flight_tracker_trip_timeline",
+    };
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._config || !this._hass) {
+      return;
+    }
+
+    const state = this._hass.states[this._config.entity];
+    if (!state || !state.attributes) {
+      this.shadowRoot.innerHTML = `${timelineStyles()}${timelineEmptyCard()}`;
+      return;
+    }
+
+    const attrs = state.attributes || {};
+    const segments = Array.isArray(attrs.segments) ? attrs.segments : [];
+    if (!segments.length) {
+      this.shadowRoot.innerHTML = `${timelineStyles()}${timelineEmptyCard(attrs)}`;
+      return;
+    }
+
+    this.shadowRoot.innerHTML = `
+      ${timelineStyles()}
+      <ha-card>
+        <article class="timeline-card" aria-label="${escapeHtml(attrs.headline || state.state)}">
+          <header class="timeline-header">
+            <span>${escapeHtml(this._config.title)}</span>
+            <strong>${escapeHtml(attrs.headline || state.state)}</strong>
+            <small>${escapeHtml(attrs.detail || "")}</small>
+          </header>
+          <ol class="timeline-list">
+            ${segments.map((segment) => timelineItem(segment)).join("")}
+          </ol>
         </article>
       </ha-card>
     `;
@@ -468,6 +538,289 @@ function styles() {
   `;
 }
 
+function timelineStyles() {
+  return `
+    <style>
+      :host {
+        display: block;
+        --flight-card-green: #00f58a;
+        --flight-card-red: #ff4d5f;
+        --flight-card-muted: rgba(255, 255, 255, 0.64);
+        --flight-card-border: rgba(255, 255, 255, 0.12);
+      }
+
+      ha-card {
+        background: transparent;
+        box-shadow: none;
+        border: 0;
+      }
+
+      .timeline-card {
+        overflow: hidden;
+        padding: 22px 24px 18px;
+        border: 1px solid var(--flight-card-border);
+        border-radius: 28px;
+        color: #f8fbff;
+        background:
+          radial-gradient(circle at 88% 8%, rgba(104, 82, 255, 0.30), transparent 34%),
+          radial-gradient(circle at 36% 100%, rgba(0, 245, 138, 0.20), transparent 42%),
+          linear-gradient(155deg, #050506 0%, #15111d 56%, #070808 100%);
+        box-sizing: border-box;
+        font-family: var(--primary-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      }
+
+      .timeline-header {
+        display: grid;
+        gap: 5px;
+        margin-bottom: 18px;
+      }
+
+      .timeline-header span {
+        color: var(--flight-card-green);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .timeline-header strong {
+        color: #ffffff;
+        font-size: 26px;
+        line-height: 1.1;
+        font-weight: 800;
+      }
+
+      .timeline-header small {
+        color: var(--flight-card-muted);
+        font-size: 14px;
+      }
+
+      .timeline-list {
+        display: grid;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 72px 28px minmax(0, 1fr);
+        gap: 12px;
+        min-height: 58px;
+        color: var(--flight-card-muted);
+      }
+
+      .timeline-item.is-current {
+        color: #ffffff;
+      }
+
+      .timeline-time {
+        padding-top: 2px;
+        color: rgba(255, 255, 255, 0.70);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.25;
+        text-align: right;
+      }
+
+      .timeline-rail {
+        position: relative;
+        display: grid;
+        justify-items: center;
+      }
+
+      .timeline-rail::before {
+        content: "";
+        position: absolute;
+        top: 24px;
+        bottom: -4px;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .timeline-item:last-child .timeline-rail::before {
+        display: none;
+      }
+
+      .timeline-dot {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        color: #07100c;
+        background: rgba(255, 255, 255, 0.26);
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .timeline-item.is-current .timeline-dot,
+      .timeline-item.is-next .timeline-dot {
+        background: var(--flight-card-green);
+        box-shadow: 0 0 18px rgba(0, 245, 138, 0.42);
+      }
+
+      .timeline-item.kind-flight.is-current .timeline-dot {
+        background: var(--flight-card-green);
+      }
+
+      .timeline-item.kind-base_return .timeline-dot {
+        background: #ffffff;
+      }
+
+      .timeline-body {
+        min-width: 0;
+        padding-bottom: 18px;
+      }
+
+      .timeline-body strong {
+        display: block;
+        overflow: hidden;
+        color: #ffffff;
+        font-size: 16px;
+        line-height: 1.2;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .timeline-body span {
+        display: block;
+        overflow: hidden;
+        margin-top: 4px;
+        color: var(--flight-card-muted);
+        font-size: 13px;
+        line-height: 1.25;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .timeline-status {
+        display: inline-flex;
+        margin-top: 8px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        color: #07100c;
+        background: rgba(255, 255, 255, 0.72);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .timeline-item.is-current .timeline-status,
+      .timeline-item.is-next .timeline-status {
+        background: var(--flight-card-green);
+      }
+
+      .timeline-item.is-past {
+        opacity: 0.62;
+      }
+
+      .timeline-empty {
+        min-height: 132px;
+        display: grid;
+        align-content: center;
+        gap: 8px;
+      }
+
+      .timeline-empty strong {
+        color: #ffffff;
+        font-size: 24px;
+      }
+
+      .timeline-empty span {
+        color: var(--flight-card-muted);
+      }
+
+      @media (max-width: 520px) {
+        .timeline-card {
+          padding: 18px 16px 14px;
+          border-radius: 24px;
+        }
+
+        .timeline-header strong {
+          font-size: 22px;
+        }
+
+        .timeline-item {
+          grid-template-columns: 58px 24px minmax(0, 1fr);
+          gap: 9px;
+        }
+
+        .timeline-time {
+          font-size: 12px;
+        }
+      }
+    </style>
+  `;
+}
+
+function timelineEmptyCard(attrs = {}) {
+  return `
+    <ha-card>
+      <article class="timeline-card timeline-empty">
+        <strong>${escapeHtml(attrs.headline || "No travel day")}</strong>
+        <span>${escapeHtml(attrs.detail || "The next roster day will appear here once the calendar has one.")}</span>
+      </article>
+    </ha-card>
+  `;
+}
+
+function timelineItem(segment) {
+  const phase = timelinePhaseClass(segment.phase);
+  const kind = `kind-${String(segment.kind || "event").replace(/[^a-z0-9_-]/gi, "_")}`;
+  return `
+    <li class="timeline-item ${phase} ${kind}">
+      <div class="timeline-time">${segmentTime(segment)}</div>
+      <div class="timeline-rail">
+        <span class="timeline-dot">${escapeHtml(segmentIcon(segment.kind))}</span>
+      </div>
+      <div class="timeline-body">
+        <strong>${escapeHtml(segment.title || "Roster item")}</strong>
+        <span>${escapeHtml(segment.detail || segment.route || "")}</span>
+        <b class="timeline-status">${escapeHtml(segment.status || segmentMeta(segment))}</b>
+      </div>
+    </li>
+  `;
+}
+
+function timelinePhaseClass(phase) {
+  if (phase === "current") {
+    return "is-current";
+  }
+  if (phase === "past") {
+    return "is-past";
+  }
+  return "is-next";
+}
+
+function segmentTime(segment) {
+  const start = parseDate(segment.start);
+  const end = parseDate(segment.end);
+  return `${formatTime(start)}<br>${formatTime(end)}`;
+}
+
+function segmentIcon(kind) {
+  const icons = {
+    flight: "FLT",
+    layover: "LAY",
+    hotel: "HTL",
+    transfer: "CAR",
+    base_return: "AMS",
+    training: "TRN",
+    off: "OFF",
+  };
+  return icons[kind] || "DAY";
+}
+
+function segmentMeta(segment) {
+  if (segment.duration_minutes) {
+    return durationLabel(segment.duration_minutes * 60000);
+  }
+  return "";
+}
+
 function emptyCard() {
   return `
     <ha-card>
@@ -687,6 +1040,7 @@ function escapeHtml(value) {
 }
 
 customElements.define("flight-tracker-card", FlightTrackerCard);
+customElements.define("flight-tracker-timeline-card", FlightTrackerTimelineCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
@@ -694,6 +1048,12 @@ window.customCards.push({
   name: "Flight Tracker Card",
   preview: true,
   description: "Compact flight status card for iCal Flight Tracker.",
+});
+window.customCards.push({
+  type: "flight-tracker-timeline-card",
+  name: "Flight Tracker Timeline Card",
+  preview: true,
+  description: "Travel day timeline card for iCal Flight Tracker.",
 });
 
 console.info(

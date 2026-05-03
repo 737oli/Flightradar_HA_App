@@ -10,6 +10,7 @@ The parser is tuned for KLC-style roster events such as `KL1327 AMS-KRK` and `DH
 
 - `sensor.<name>_next_flight`
 - `sensor.<name>_current_flight`
+- `sensor.<name>_trip_timeline`
 - `sensor.<name>_travel_status`
 - `sensor.<name>_tracked_flights`
 - `binary_sensor.<name>_flight_active`
@@ -43,7 +44,7 @@ The integration serves a no-build Lovelace card that is styled after the compact
 Add this dashboard resource:
 
 ```text
-/flight_tracker_static/flight-tracker-card.js
+/flight_tracker_static/flight-tracker-card.js?v=0.4.1
 ```
 
 Resource type:
@@ -59,6 +60,15 @@ type: custom:flight-tracker-card
 current_entity: sensor.ical_flight_tracker_current_flight
 next_entity: sensor.ical_flight_tracker_next_flight
 ```
+
+For the whole travel day view, add the timeline card:
+
+```yaml
+type: custom:flight-tracker-timeline-card
+entity: sensor.ical_flight_tracker_trip_timeline
+```
+
+The timeline card shows the relevant roster day with hotel, taxi/transfer, previous flight, current flight, next flight, layovers between flights, and a base return segment when the final leg returns to AMS without a hotel afterward.
 
 If you prefer to use existing HACS frontend cards instead, the same entity attributes can also be styled with `button-card` plus `card-mod`, but this repository includes its own card so the first version does not depend on extra frontend plugins.
 
@@ -77,6 +87,18 @@ Useful attributes on the travel status sensor:
 - `minutes_until_departure`
 - `minutes_until_arrival`
 - `max_delay_minutes`
+
+The `trip_timeline` sensor exposes:
+
+- `headline`
+- `detail`
+- `segments`
+- `current_segment`
+- `previous_flight`
+- `current_flight`
+- `next_flight`
+- `duty_start`
+- `duty_end`
 
 The binary sensors are designed as simple notification triggers. For example, notify when the flight is delayed:
 

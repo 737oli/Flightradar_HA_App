@@ -12,6 +12,7 @@ assert SPEC.loader is not None
 sys.modules[SPEC.name] = calendar_module
 SPEC.loader.exec_module(calendar_module)
 parse_flights = calendar_module.parse_flights
+parse_roster_events = calendar_module.parse_roster_events
 
 
 def test_ignores_non_kl_flight_numbers():
@@ -110,6 +111,42 @@ END:VCALENDAR
     assert flights[0].flight_number == "KL1978"
     assert flights[0].route == "DBV -> AMS"
     assert flights[0].is_deadhead is True
+
+
+def test_parse_roster_events_for_flight_day_hotel_and_taxi():
+    ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:duty-1
+DTSTART:20260124T152000Z
+DTEND:20260124T221000Z
+SUMMARY:Flight Day
+END:VEVENT
+BEGIN:VEVENT
+UID:hotel-1
+DTSTART:20260124T221000Z
+DTEND:20260125T120000Z
+SUMMARY:Hotel STR
+URL:http://maps.apple.com/?q=Jaz+in+the+City+Stuttgart%2C+Stuttgart
+END:VEVENT
+BEGIN:VEVENT
+UID:taxi-1
+DTSTART:20260125T120000Z
+DTEND:20260125T123000Z
+SUMMARY:Taxi
+END:VEVENT
+END:VCALENDAR
+"""
+
+    events = parse_roster_events(
+        ics,
+        datetime(2026, 1, 24, tzinfo=timezone.utc),
+        timedelta(days=10),
+    )
+
+    assert [event.kind for event in events] == ["duty", "hotel", "transfer"]
+    assert events[1].airport == "STR"
+    assert events[1].url.startswith("http://maps.apple.com/")
 
 
 def test_ignores_non_flight_events():

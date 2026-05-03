@@ -41,6 +41,9 @@
   },
   "entity": {
     "sensor": {
+      "trip_timeline": {
+        "name": "Trip timeline"
+      },
       "travel_status": {
         "name": "Travel status"
       },

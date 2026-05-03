@@ -15,8 +15,14 @@ from .const import ATTR_FLIGHTS, DOMAIN
 from .coordinator import FlightTrackerCoordinator
 from .entity import async_coordinator, compact_flight, flight_attributes
 from .summary import TravelStatusSummary, build_travel_status
+from .timeline import TripTimelineSummary, build_trip_timeline
 
 SENSOR_DESCRIPTIONS = (
+    SensorEntityDescription(
+        key="trip_timeline",
+        translation_key="trip_timeline",
+        icon="mdi:timeline-clock",
+    ),
     SensorEntityDescription(
         key="travel_status",
         translation_key="travel_status",
@@ -80,6 +86,9 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
     def native_value(self) -> str | int | None:
         """Return the state value."""
         data = self.coordinator.data
+        if self.entity_description.key == "trip_timeline":
+            return _trip_timeline(data).native_value
+
         if self.entity_description.key == "travel_status":
             return _travel_status(data).native_value
 
@@ -107,6 +116,11 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return sensor attributes."""
         data = self.coordinator.data
+        if self.entity_description.key == "trip_timeline":
+            attrs = _trip_timeline_attributes(_trip_timeline(data))
+            attrs["last_refresh"] = data.last_refresh.isoformat()
+            return attrs
+
         if self.entity_description.key == "travel_status":
             attrs = _travel_status_attributes(_travel_status(data))
             attrs["last_refresh"] = data.last_refresh.isoformat()
@@ -135,6 +149,36 @@ def _travel_status(data) -> TravelStatusSummary:
         data.status_for(data.next_flight),
         data.last_refresh,
     )
+
+
+def _trip_timeline(data) -> TripTimelineSummary:
+    """Return the current trip timeline."""
+    return build_trip_timeline(
+        data.roster_events,
+        data.statuses,
+        data.last_refresh,
+    )
+
+
+def _trip_timeline_attributes(summary: TripTimelineSummary) -> dict[str, Any]:
+    """Return Home Assistant attributes for a trip timeline."""
+    return {
+        "phase": summary.phase,
+        "headline": summary.headline,
+        "detail": summary.detail,
+        "day_start": summary.day_start.isoformat() if summary.day_start else None,
+        "day_end": summary.day_end.isoformat() if summary.day_end else None,
+        "duty_start": summary.duty_start.isoformat() if summary.duty_start else None,
+        "duty_end": summary.duty_end.isoformat() if summary.duty_end else None,
+        "origin": summary.origin,
+        "destination": summary.destination,
+        "segment_count": len(summary.segments),
+        "segments": summary.segments,
+        "current_segment": summary.current_segment,
+        "previous_flight": summary.previous_flight,
+        "current_flight": summary.current_flight,
+        "next_flight": summary.next_flight,
+    }
 
 
 def _travel_status_attributes(summary: TravelStatusSummary) -> dict[str, Any]:

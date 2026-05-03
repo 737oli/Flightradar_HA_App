@@ -59,15 +59,15 @@ async def _async_register_frontend_path(hass: HomeAssistant) -> None:
 
     if StaticPath is not None and hasattr(hass.http, "async_register_static_paths"):
         await hass.http.async_register_static_paths(
-            [StaticPath(FRONTEND_URL_PATH, frontend_path, True)]
+            [StaticPath(FRONTEND_URL_PATH, frontend_path, False)]
         )
     elif hasattr(hass.http, "async_register_static_path"):
         result = hass.http.async_register_static_path(
-            FRONTEND_URL_PATH, frontend_path, True
+            FRONTEND_URL_PATH, frontend_path, False
         )
         if isawaitable(result):
             await result
     else:
-        hass.http.register_static_path(FRONTEND_URL_PATH, frontend_path, True)
+        hass.http.register_static_path(FRONTEND_URL_PATH, frontend_path, False)
 
     hass.data[FRONTEND_REGISTERED] = True

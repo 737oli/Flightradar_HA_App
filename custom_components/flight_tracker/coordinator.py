@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import AirFranceKlmClient, FlightStatus
-from .calendar import FlightEvent, parse_flights
+from .calendar import FlightEvent, RosterEvent, parse_flights, parse_roster_events
 from .const import (
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
@@ -36,6 +36,7 @@ class FlightTrackerSnapshot:
     """Current integration data."""
 
     flights: list[FlightEvent]
+    roster_events: list[RosterEvent]
     current_flight: FlightEvent | None
     next_flight: FlightEvent | None
     statuses: dict[str, FlightStatus]
@@ -82,8 +83,8 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
                 )
             )
             default_tz = dt_util.get_time_zone(self.hass.config.time_zone) or timezone.utc
-            flights = await self.hass.async_add_executor_job(
-                parse_flights,
+            flights, roster_events = await self.hass.async_add_executor_job(
+                _parse_calendar_data,
                 ics_text,
                 now,
                 lookahead,
@@ -104,6 +105,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
 
         return FlightTrackerSnapshot(
             flights=flights,
+            roster_events=roster_events,
             current_flight=current_flight,
             next_flight=next_flight,
             statuses=statuses,
@@ -208,3 +210,16 @@ def _in_live_window(flight: FlightEvent, now: datetime) -> bool:
 def _entry_value(entry: ConfigEntry, key: str, default: object) -> object:
     """Read an option override with data fallback."""
     return entry.options.get(key, entry.data.get(key, default))
+
+
+def _parse_calendar_data(
+    ics_text: str,
+    now: datetime,
+    lookahead: timedelta,
+    default_tz: timezone,
+) -> tuple[list[FlightEvent], list[RosterEvent]]:
+    """Parse flights and roster events in one executor job."""
+    return (
+        parse_flights(ics_text, now, lookahead, default_tz),
+        parse_roster_events(ics_text, now, lookahead, default_tz),
+    )
