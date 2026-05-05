@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.3.1";
+const CARD_VERSION = "0.3.3";
 const EMPTY_STATES = new Set(["unknown", "unavailable", "none", "not_flying"]);
 
 class FlightTrackerCard extends HTMLElement {
@@ -557,9 +557,9 @@ function timelineStyles() {
 
       .timeline-card {
         overflow: hidden;
-        padding: 22px 24px 18px;
+        padding: 24px 26px 20px;
         border: 1px solid var(--flight-card-border);
-        border-radius: 28px;
+        border-radius: 30px;
         color: #f8fbff;
         background:
           radial-gradient(circle at 88% 8%, rgba(104, 82, 255, 0.30), transparent 34%),
@@ -572,7 +572,7 @@ function timelineStyles() {
       .timeline-header {
         display: grid;
         gap: 5px;
-        margin-bottom: 18px;
+        margin-bottom: 22px;
       }
 
       .timeline-header span {
@@ -584,7 +584,7 @@ function timelineStyles() {
 
       .timeline-header strong {
         color: #ffffff;
-        font-size: 26px;
+        font-size: 30px;
         line-height: 1.1;
         font-weight: 800;
       }
@@ -604,9 +604,9 @@ function timelineStyles() {
 
       .timeline-item {
         display: grid;
-        grid-template-columns: 72px 28px minmax(0, 1fr);
-        gap: 12px;
-        min-height: 58px;
+        grid-template-columns: 76px 34px minmax(0, 1fr);
+        gap: 13px;
+        min-height: 66px;
         color: var(--flight-card-muted);
       }
 
@@ -615,12 +615,38 @@ function timelineStyles() {
       }
 
       .timeline-time {
-        padding-top: 2px;
+        padding-top: 3px;
         color: rgba(255, 255, 255, 0.70);
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
         line-height: 1.25;
         text-align: right;
+      }
+
+      .timeline-time-row {
+        display: block;
+        min-height: 18px;
+      }
+
+      .timeline-time-row b {
+        font-weight: 800;
+      }
+
+      .timeline-time-delta {
+        display: block;
+        color: rgba(255, 255, 255, 0.48);
+        font-size: 10px;
+        font-style: normal;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+
+      .timeline-time-delta.is-late {
+        color: var(--flight-card-red);
+      }
+
+      .timeline-time-delta.is-early {
+        color: var(--flight-card-green);
       }
 
       .timeline-rail {
@@ -632,10 +658,14 @@ function timelineStyles() {
       .timeline-rail::before {
         content: "";
         position: absolute;
-        top: 24px;
+        top: 30px;
         bottom: -4px;
         width: 2px;
-        background: rgba(255, 255, 255, 0.14);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.20),
+          rgba(255, 255, 255, 0.08)
+        );
       }
 
       .timeline-item:last-child .timeline-rail::before {
@@ -647,17 +677,17 @@ function timelineStyles() {
         z-index: 1;
         display: grid;
         place-items: center;
-        width: 24px;
-        height: 24px;
+        width: 30px;
+        height: 30px;
         border-radius: 999px;
         color: #07100c;
         background: rgba(255, 255, 255, 0.26);
         font-size: 10px;
         font-weight: 900;
+        letter-spacing: 0;
       }
 
-      .timeline-item.is-current .timeline-dot,
-      .timeline-item.is-next .timeline-dot {
+      .timeline-item.is-current .timeline-dot {
         background: var(--flight-card-green);
         box-shadow: 0 0 18px rgba(0, 245, 138, 0.42);
       }
@@ -670,20 +700,43 @@ function timelineStyles() {
         background: #ffffff;
       }
 
-      .timeline-body {
-        min-width: 0;
-        padding-bottom: 18px;
+      .timeline-item.kind-ground_time.is-current .timeline-dot {
+        background: rgba(0, 245, 138, 0.88);
       }
 
-      .timeline-body strong {
-        display: block;
+      .timeline-body {
+        min-width: 0;
+        padding-bottom: 20px;
+      }
+
+      .timeline-heading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .timeline-title {
+        display: inline-block;
         overflow: hidden;
         color: #ffffff;
-        font-size: 16px;
+        font-size: 18px;
         line-height: 1.2;
         font-weight: 800;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .timeline-aircraft {
+        flex: 0 0 auto;
+        padding: 3px 7px;
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.76);
+        background: rgba(255, 255, 255, 0.10);
+        font-size: 11px;
+        font-style: normal;
+        font-weight: 900;
+        line-height: 1;
       }
 
       .timeline-body span {
@@ -691,26 +744,34 @@ function timelineStyles() {
         overflow: hidden;
         margin-top: 4px;
         color: var(--flight-card-muted);
-        font-size: 13px;
+        font-size: 14px;
         line-height: 1.25;
         text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: normal;
       }
 
       .timeline-status {
         display: inline-flex;
-        margin-top: 8px;
-        padding: 4px 8px;
+        margin-top: 10px;
+        padding: 5px 10px;
         border-radius: 999px;
         color: #07100c;
         background: rgba(255, 255, 255, 0.72);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 800;
       }
 
-      .timeline-item.is-current .timeline-status,
-      .timeline-item.is-next .timeline-status {
+      .timeline-status.is-hidden {
+        display: none;
+      }
+
+      .timeline-item.is-current .timeline-status {
         background: var(--flight-card-green);
+      }
+
+      .timeline-item .timeline-status.is-delayed {
+        color: #ffffff;
+        background: var(--flight-card-red);
       }
 
       .timeline-item.is-past {
@@ -744,12 +805,18 @@ function timelineStyles() {
         }
 
         .timeline-item {
-          grid-template-columns: 58px 24px minmax(0, 1fr);
+          grid-template-columns: 58px 28px minmax(0, 1fr);
           gap: 9px;
         }
 
         .timeline-time {
           font-size: 12px;
+        }
+
+        .timeline-dot {
+          width: 26px;
+          height: 26px;
+          font-size: 9px;
         }
       }
     </style>
@@ -770,19 +837,53 @@ function timelineEmptyCard(attrs = {}) {
 function timelineItem(segment) {
   const phase = timelinePhaseClass(segment.phase);
   const kind = `kind-${String(segment.kind || "event").replace(/[^a-z0-9_-]/gi, "_")}`;
+  const status = timelineStatusClass(segment.status || segmentMeta(segment));
   return `
-    <li class="timeline-item ${phase} ${kind}">
+    <li class="timeline-item ${phase} ${kind} ${status}">
       <div class="timeline-time">${segmentTime(segment)}</div>
       <div class="timeline-rail">
         <span class="timeline-dot">${escapeHtml(segmentIcon(segment.kind))}</span>
       </div>
       <div class="timeline-body">
-        <strong>${escapeHtml(segment.title || "Roster item")}</strong>
-        <span>${escapeHtml(segment.detail || segment.route || "")}</span>
-        <b class="timeline-status">${escapeHtml(segment.status || segmentMeta(segment))}</b>
+        ${timelineHeading(segment)}
+        <span>${escapeHtml(segmentDetail(segment))}</span>
+        ${timelineStatus(segment)}
       </div>
     </li>
   `;
+}
+
+function timelineHeading(segment) {
+  const title = escapeHtml(segment.title || "Roster item");
+  const aircraft =
+    segment.kind === "flight" && segment.aircraft_type
+      ? `<em class="timeline-aircraft">${escapeHtml(segment.aircraft_type)}</em>`
+      : "";
+  return `<div class="timeline-heading"><strong class="timeline-title">${title}</strong>${aircraft}</div>`;
+}
+
+function segmentDetail(segment) {
+  if (segment.kind === "flight") {
+    return segment.route || segment.detail || "";
+  }
+  return segment.detail || segment.route || "";
+}
+
+function timelineStatus(segment) {
+  const status = segment.status || segmentMeta(segment);
+  if (!status || ["upcoming", "done"].includes(String(status).toLowerCase())) {
+    return "";
+  }
+  const delayed = timelineStatusClass(status);
+  return `<b class="timeline-status${delayed}">${escapeHtml(status)}</b>`;
+}
+
+function timelineStatusClass(status) {
+  return String(status || "")
+    .toLowerCase()
+    .includes("delayed")
+    ? " is-delayed"
+    : "";
 }
 
 function timelinePhaseClass(phase) {
@@ -798,13 +899,32 @@ function timelinePhaseClass(phase) {
 function segmentTime(segment) {
   const start = parseDate(segment.start);
   const end = parseDate(segment.end);
-  return `${formatTime(start)}<br>${formatTime(end)}`;
+  return `${timeRow(start, segment.departure_time_delta_minutes)}${timeRow(
+    end,
+    segment.arrival_time_delta_minutes,
+  )}`;
+}
+
+function timeRow(date, deltaMinutes) {
+  const delta = timeDeltaLabel(deltaMinutes);
+  return `<span class="timeline-time-row"><b>${formatTime(date)}</b>${delta}</span>`;
+}
+
+function timeDeltaLabel(deltaMinutes) {
+  if (!Number.isFinite(Number(deltaMinutes)) || Number(deltaMinutes) === 0) {
+    return "";
+  }
+  const minutes = Number(deltaMinutes);
+  const tone = minutes > 0 ? "is-late" : "is-early";
+  const sign = minutes > 0 ? "+" : "";
+  return `<em class="timeline-time-delta ${tone}">${sign}${minutes}m</em>`;
 }
 
 function segmentIcon(kind) {
   const icons = {
     flight: "FLT",
     layover: "LAY",
+    ground_time: "GND",
     hotel: "HTL",
     transfer: "CAR",
     base_return: "AMS",

@@ -135,6 +135,7 @@ def _anchor_priority(event: RosterEvent) -> tuple[int, float]:
     """Sort active events by usefulness as a timeline anchor."""
     priorities = {
         "flight": 0,
+        "ground_time": 1,
         "transfer": 1,
         "hotel": 2,
         "duty": 3,
@@ -155,7 +156,14 @@ def _day_bounds(value: datetime, tzinfo: timezone) -> tuple[datetime, datetime]:
 
 def _segment_events(events: list[RosterEvent]) -> list[RosterEvent]:
     """Return events that should be shown as timeline rows."""
-    display_kinds = {"flight", "hotel", "transfer", "training", "event"}
+    display_kinds = {
+        "flight",
+        "ground_time",
+        "hotel",
+        "transfer",
+        "training",
+        "event",
+    }
     segments = [event for event in events if event.kind in display_kinds]
     if segments:
         return sorted(segments, key=lambda event: (event.start, event.end))
@@ -171,13 +179,13 @@ def _segments_from_events(
     now: datetime,
     duty_end: datetime | None,
 ) -> list[dict[str, Any]]:
-    """Return display segments with synthetic layovers/base return inserted."""
+    """Return display segments with synthetic gaps/base return inserted."""
     segments: list[dict[str, Any]] = []
     previous_flight: RosterEvent | None = None
 
     for event in events:
         if event.kind == "flight" and previous_flight is not None:
-            layover = _layover_segment(previous_flight, event, statuses, now)
+            layover = _layover_segment(previous_flight, event, events, statuses, now)
             if layover:
                 segments.append(layover)
 
@@ -223,16 +231,37 @@ def _segment_from_event(
         "is_deadhead": event.is_deadhead,
         "url": event.url or None,
     }
+    if event.kind == "flight":
+        segment.update(
+            {
+                "scheduled_start": event.start.isoformat(),
+                "scheduled_end": event.end.isoformat(),
+                "departure_time_delta_minutes": _time_delta_minutes(
+                    event.start,
+                    start,
+                    status.departure_delay_minutes if status else None,
+                ),
+                "arrival_time_delta_minutes": _time_delta_minutes(
+                    event.end,
+                    end,
+                    status.arrival_delay_minutes if status else None,
+                ),
+            }
+        )
     return {key: value for key, value in segment.items() if value is not None}
 
 
 def _layover_segment(
     previous: RosterEvent,
     upcoming: RosterEvent,
+    events: list[RosterEvent],
     statuses: dict[str, FlightStatus],
     now: datetime,
 ) -> dict[str, Any] | None:
     """Return a synthetic layover segment between two flights."""
+    if _has_roster_gap_segment(previous, upcoming, events):
+        return None
+
     start = _effective_end(previous, statuses.get(previous.uid))
     end = _effective_start(upcoming, statuses.get(upcoming.uid))
     if end - start < LAYOVER_MINIMUM:
@@ -251,6 +280,27 @@ def _layover_segment(
         now=now,
         airport=airport,
     )
+
+
+def _has_roster_gap_segment(
+    previous: RosterEvent,
+    upcoming: RosterEvent,
+    events: list[RosterEvent],
+) -> bool:
+    """Return whether a roster row already describes the time between flights."""
+    gap_start = previous.end
+    gap_end = upcoming.start
+    if gap_end <= gap_start:
+        return False
+
+    for event in events:
+        if event.uid in {previous.uid, upcoming.uid} or event.kind == "flight":
+            continue
+        if event.end <= gap_start or event.start >= gap_end:
+            continue
+        return True
+
+    return False
 
 
 def _base_return_segment(
@@ -340,6 +390,8 @@ def _title_detail(
     if event.kind == "hotel":
         place = f" in {event.airport}" if event.airport else ""
         return event.title, f"Overnight{place}"
+    if event.kind == "ground_time":
+        return event.title, event.location or "Ground time"
     if event.kind == "transfer":
         return event.title, "Transfer"
     return event.title, event.location
@@ -351,27 +403,21 @@ def _status_label(
     start: datetime,
     end: datetime,
     now: datetime,
-) -> str:
+) -> str | None:
     """Return a compact segment status."""
+    is_current = start <= now <= end
     if event.kind == "flight":
         delay = _max_delay(status)
         if delay and delay > 5:
             return f"Delayed {delay}m"
-        if status and status.status:
+        if is_current and status and status.status:
             return status.status
-        return _relative_status(start, end, now)
+        return "Now" if is_current else None
     if event.kind == "hotel" and start <= now <= end:
         return "At hotel"
-    return _relative_status(start, end, now)
-
-
-def _relative_status(start: datetime, end: datetime, now: datetime) -> str:
-    """Return past/current/future status text."""
-    if start <= now <= end:
+    if is_current:
         return "Now"
-    if end < now:
-        return "Done"
-    return "Upcoming"
+    return None
 
 
 def _segment_phase(start: datetime, end: datetime, now: datetime) -> str:
@@ -398,6 +444,18 @@ def _duration_label(start: datetime, end: datetime) -> str:
     if hours:
         return f"{hours}h"
     return f"{remainder}m"
+
+
+def _time_delta_minutes(
+    scheduled: datetime,
+    live: datetime,
+    provider_delta: int | None,
+) -> int | None:
+    """Return the displayed live-time delta for a scheduled time."""
+    if provider_delta is not None:
+        return provider_delta
+    delta = round((live - scheduled).total_seconds() / 60)
+    return delta if delta else None
 
 
 def _max_delay(status: FlightStatus | None) -> int | None:

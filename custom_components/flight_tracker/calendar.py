@@ -310,6 +310,10 @@ def _event_kind(
         return "flight"
     if normalized == "FLIGHT DAY":
         return "duty"
+    if normalized.startswith(
+        ("OMDRAAI", "GRONDTIJD", "GROUND TIME", "GROUNDTIME", "TURNAROUND")
+    ):
+        return "ground_time"
     if normalized.startswith("HOTEL"):
         return "hotel"
     if normalized in {"TAXI", "PICKUP"}:

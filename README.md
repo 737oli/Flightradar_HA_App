@@ -95,7 +95,7 @@ type: custom:flight-tracker-timeline-card
 entity: sensor.ical_flight_tracker_trip_timeline
 ```
 
-The timeline card shows the relevant roster day with hotel, taxi/transfer, previous flight, current flight, next flight, layovers between flights, and a base return segment when the final leg returns to AMS without a hotel afterward.
+The timeline card shows the relevant roster day with hotel, taxi/transfer, previous flight, current flight, next flight, KLC ground-time rows such as `Omdraai` and `Grondtijd`, and a base return segment when the final leg returns to AMS without a hotel afterward. Synthetic layovers are only used when the roster does not already contain a row for the gap between flights. When live AF-KLM data is available, flight rows use live/estimated times and show compact early/late deltas against the scheduled roster times.
 
 If you prefer to use existing HACS frontend cards instead, the same entity attributes can also be styled with `button-card` plus `card-mod`, but this repository includes its own card so the first version does not depend on extra frontend plugins.
 
