@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, TYPE_CHECKING
 from urllib.parse import quote
 
 from .calendar import FlightEvent
@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 
 AFKL_BASE_URL = "https://api.airfranceklm.com/opendata/flightstatus/v4"
 KLM_CARRIER_CODE = "KL"
+RequestGuard = Callable[[], Awaitable[None]]
+
+
+class AirFranceKlmRequestBlocked(Exception):
+    """Raised when an AF-KLM request is blocked before it is sent."""
 
 
 @dataclass(frozen=True)
@@ -73,10 +78,12 @@ class AirFranceKlmClient:
         session: ClientSession,
         api_key: str,
         consumer_host: str = KLM_CARRIER_CODE,
+        request_guard: RequestGuard | None = None,
     ) -> None:
         """Initialize the client."""
         self._session = session
         self._api_key = api_key
+        self._request_guard = request_guard
         normalized_host = str(consumer_host).strip().upper()
         self._consumer_host = (
             normalized_host
@@ -84,12 +91,24 @@ class AirFranceKlmClient:
             else KLM_CARRIER_CODE
         )
 
-    async def async_get_status(self, event: FlightEvent) -> FlightStatus | None:
+    async def async_get_status(
+        self, event: FlightEvent, cached_flight_id: str | None = None
+    ) -> FlightStatus | None:
         """Fetch live status for a calendar flight."""
         if not event.flight_number or not event.airline_code:
             return None
         if event.airline_code.upper() != KLM_CARRIER_CODE:
             return None
+
+        if cached_flight_id:
+            try:
+                detailed = await self._async_detail_by_id(cached_flight_id, event)
+            except AirFranceKlmRequestBlocked:
+                raise
+            except Exception:  # noqa: BLE001
+                detailed = None
+            if detailed:
+                return _status_from_flight(event, detailed)
 
         data = await self._request(
             "/flights",
@@ -121,6 +140,8 @@ class AirFranceKlmClient:
         )
         try:
             detailed = await self._async_detail(best, event)
+        except AirFranceKlmRequestBlocked:
+            return _status_from_flight(event, best)
         except Exception:  # noqa: BLE001
             detailed = None
         return _status_from_flight(event, detailed or best)
@@ -134,7 +155,21 @@ class AirFranceKlmClient:
             return None
 
         data = await self._request(
-            f"/flights/{quote(str(flight_id), safe='')}",
+            _flight_detail_path(flight_id),
+            {
+                "origin": event.departure_airport,
+                "expand": "trajectory",
+                "consumerHost": self._consumer_host,
+            },
+        )
+        return data if isinstance(data, dict) else None
+
+    async def _async_detail_by_id(
+        self, flight_id: str, event: FlightEvent
+    ) -> dict[str, Any] | None:
+        """Fetch detailed flight status directly from a cached flight id."""
+        data = await self._request(
+            _flight_detail_path(flight_id),
             {
                 "origin": event.departure_airport,
                 "expand": "trajectory",
@@ -145,6 +180,9 @@ class AirFranceKlmClient:
 
     async def _request(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
         """Request JSON from Air France-KLM."""
+        if self._request_guard:
+            await self._request_guard()
+
         headers = {
             "API-Key": self._api_key,
             "accept": "application/hal+json, application/json",
@@ -162,6 +200,11 @@ class AirFranceKlmClient:
         ) as response:
             response.raise_for_status()
             return await response.json(content_type=None)
+
+
+def _flight_detail_path(flight_id: str) -> str:
+    """Return the encoded AF-KLM detail path for a flight id."""
+    return f"/flights/{quote(str(flight_id), safe='')}"
 
 
 def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightStatus:

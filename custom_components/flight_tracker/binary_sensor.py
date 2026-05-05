@@ -45,6 +45,11 @@ BINARY_SENSOR_DESCRIPTIONS = (
         translation_key="flight_landed",
         icon="mdi:airplane-check",
     ),
+    BinarySensorEntityDescription(
+        key="api_budget_exhausted",
+        translation_key="api_budget_exhausted",
+        icon="mdi:api-off",
+    ),
 )
 
 
@@ -89,6 +94,9 @@ class FlightTrackerBinarySensor(
     @property
     def is_on(self) -> bool:
         """Return the binary sensor state."""
+        if self.entity_description.key == "api_budget_exhausted":
+            return self.coordinator.data.api_usage.exhausted
+
         summary = _travel_status(self.coordinator.data)
         if self.entity_description.key == "flight_active":
             return summary.is_active
@@ -105,6 +113,17 @@ class FlightTrackerBinarySensor(
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return notification context attributes."""
+        if self.entity_description.key == "api_budget_exhausted":
+            usage = self.coordinator.data.api_usage
+            return {
+                "date": usage.date,
+                "requests_today": usage.requests_today,
+                "daily_limit": usage.daily_limit,
+                "requests_remaining": usage.remaining,
+                "cached_flight_ids": usage.cached_flight_ids,
+                "last_request_at": usage.last_request_at,
+            }
+
         summary = _travel_status(self.coordinator.data)
         return {
             "phase": summary.phase,

@@ -14,7 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import AirFranceKlmClient, FlightStatus
+from .api import AirFranceKlmClient, AirFranceKlmRequestBlocked, FlightStatus
+from .api_usage import ApiUsageManager, ApiUsageSnapshot
 from .calendar import FlightEvent, RosterEvent, parse_flights, parse_roster_events
 from .const import (
     CONF_LOOKAHEAD_DAYS,
@@ -40,6 +41,7 @@ class FlightTrackerSnapshot:
     current_flight: FlightEvent | None
     next_flight: FlightEvent | None
     statuses: dict[str, FlightStatus]
+    api_usage: ApiUsageSnapshot
     last_refresh: datetime
 
     def status_for(self, event: FlightEvent | None) -> FlightStatus | None:
@@ -60,6 +62,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         """Initialize the coordinator."""
         self.entry = entry
         self._session = session
+        self._api_usage = ApiUsageManager(hass, entry.entry_id)
         minutes = _entry_value(
             entry, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
         )
@@ -102,6 +105,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         statuses = await self._async_live_statuses(
             flights, now, current_flight, next_flight
         )
+        api_usage = await self._api_usage.async_snapshot(now)
 
         return FlightTrackerSnapshot(
             flights=flights,
@@ -109,6 +113,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
             current_flight=current_flight,
             next_flight=next_flight,
             statuses=statuses,
+            api_usage=api_usage,
             last_refresh=now,
         )
 
@@ -135,13 +140,27 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         if not candidates:
             return {}
 
+        async def request_guard() -> None:
+            await self._api_usage.async_acquire_request(dt_util.now())
+
         client = AirFranceKlmClient(
-            self._session, api_key, DEFAULT_CONSUMER_HOST
+            self._session,
+            api_key,
+            DEFAULT_CONSUMER_HOST,
+            request_guard=request_guard,
         )
         statuses: dict[str, FlightStatus] = {}
         for event in candidates:
             try:
-                status = await client.async_get_status(event)
+                cached_flight_id = await self._api_usage.async_get_flight_id(event, now)
+                status = await client.async_get_status(event, cached_flight_id)
+            except AirFranceKlmRequestBlocked as err:
+                _LOGGER.warning(
+                    "Air France-KLM request budget blocked live update for %s: %s",
+                    event.flight_number,
+                    err,
+                )
+                break
             except ClientResponseError as err:
                 _LOGGER.warning(
                     "Air France-KLM request failed for %s: %s",
@@ -159,6 +178,10 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
 
             if status:
                 statuses[event.uid] = status
+                if status.provider_flight_id:
+                    await self._api_usage.async_store_flight_id(
+                        event, status.provider_flight_id, now
+                    )
 
         return statuses
 

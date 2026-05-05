@@ -240,6 +240,121 @@ def test_afkl_client_ignores_non_kl_events():
     assert session.calls == []
 
 
+def test_afkl_client_uses_cached_flight_id_for_detail_request_only():
+    event = FlightEvent(
+        uid="flight-4",
+        summary="KL0643 AMS-JFK",
+        description="",
+        location="",
+        start=datetime(2026, 5, 6, 13, 20, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 6, 21, 10, tzinfo=timezone.utc),
+        flight_number="KL643",
+        airline_code="KL",
+        departure_airport="AMS",
+        arrival_airport="JFK",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+    session = FakeSession(
+        [
+            {
+                "id": "20260506+KL+0643",
+                "flightLegs": [
+                    {
+                        "departureInformation": {
+                            "times": {
+                                "scheduled": "2026-05-06T13:20:00Z",
+                            }
+                        },
+                        "arrivalInformation": {
+                            "times": {
+                                "scheduled": "2026-05-06T21:10:00Z",
+                            }
+                        },
+                    }
+                ],
+            },
+        ]
+    )
+
+    status = asyncio.run(
+        AirFranceKlmClient(session, "secret-key").async_get_status(
+            event, "20260506+KL+0643"
+        )
+    )
+
+    assert status.provider_flight_id == "20260506+KL+0643"
+    assert len(session.calls) == 1
+    assert session.calls[0]["url"] == f"{AFKL_BASE_URL}/flights/20260506%2BKL%2B0643"
+
+
+def test_afkl_client_calls_request_guard_for_each_api_request():
+    event = FlightEvent(
+        uid="flight-5",
+        summary="KL1327 AMS-KRK",
+        description="",
+        location="",
+        start=datetime(2026, 5, 6, 13, 20, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 6, 15, 10, tzinfo=timezone.utc),
+        flight_number="KL1327",
+        airline_code="KL",
+        departure_airport="AMS",
+        arrival_airport="KRK",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+    session = FakeSession(
+        [
+            {
+                "operationalFlights": [
+                    {
+                        "id": "20260506+KL+1327",
+                        "flightLegs": [
+                            {
+                                "departureInformation": {
+                                    "times": {
+                                        "scheduled": "2026-05-06T13:20:00Z",
+                                    }
+                                }
+                            }
+                        ],
+                    }
+                ]
+            },
+            {
+                "id": "20260506+KL+1327",
+                "flightLegs": [
+                    {
+                        "departureInformation": {
+                            "times": {
+                                "scheduled": "2026-05-06T13:20:00Z",
+                            }
+                        },
+                        "arrivalInformation": {
+                            "times": {
+                                "scheduled": "2026-05-06T15:10:00Z",
+                            }
+                        },
+                    }
+                ],
+            },
+        ]
+    )
+    guard_calls = 0
+
+    async def request_guard():
+        nonlocal guard_calls
+        guard_calls += 1
+
+    asyncio.run(
+        AirFranceKlmClient(
+            session, "secret-key", request_guard=request_guard
+        ).async_get_status(event)
+    )
+
+    assert guard_calls == 2
+
+
 class FakeSession:
     def __init__(self, payloads):
         self.payloads = list(payloads)

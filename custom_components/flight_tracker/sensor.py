@@ -43,6 +43,16 @@ SENSOR_DESCRIPTIONS = (
         translation_key="tracked_flights",
         icon="mdi:calendar-clock",
     ),
+    SensorEntityDescription(
+        key="api_requests_today",
+        translation_key="api_requests_today",
+        icon="mdi:counter",
+    ),
+    SensorEntityDescription(
+        key="api_requests_remaining",
+        translation_key="api_requests_remaining",
+        icon="mdi:gauge",
+    ),
 )
 
 
@@ -95,6 +105,12 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
         if self.entity_description.key == "tracked_flights":
             return len(data.flights)
 
+        if self.entity_description.key == "api_requests_today":
+            return data.api_usage.requests_today
+
+        if self.entity_description.key == "api_requests_remaining":
+            return data.api_usage.remaining
+
         event = (
             data.current_flight
             if self.entity_description.key == "current_flight"
@@ -131,6 +147,12 @@ class FlightTrackerSensor(CoordinatorEntity[FlightTrackerCoordinator], SensorEnt
                 ATTR_FLIGHTS: [compact_flight(flight) for flight in data.flights],
                 "last_refresh": data.last_refresh.isoformat(),
             }
+
+        if self.entity_description.key in {
+            "api_requests_today",
+            "api_requests_remaining",
+        }:
+            return _api_usage_attributes(data)
 
         event = (
             data.current_flight
@@ -178,6 +200,21 @@ def _trip_timeline_attributes(summary: TripTimelineSummary) -> dict[str, Any]:
         "previous_flight": summary.previous_flight,
         "current_flight": summary.current_flight,
         "next_flight": summary.next_flight,
+    }
+
+
+def _api_usage_attributes(data) -> dict[str, Any]:
+    """Return Home Assistant attributes for AF-KLM API usage."""
+    usage = data.api_usage
+    return {
+        "date": usage.date,
+        "requests_today": usage.requests_today,
+        "daily_limit": usage.daily_limit,
+        "requests_remaining": usage.remaining,
+        "budget_exhausted": usage.exhausted,
+        "cached_flight_ids": usage.cached_flight_ids,
+        "last_request_at": usage.last_request_at,
+        "last_refresh": data.last_refresh.isoformat(),
     }
 
 

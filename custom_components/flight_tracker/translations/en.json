@@ -55,6 +55,12 @@
       },
       "tracked_flights": {
         "name": "Tracked flights"
+      },
+      "api_requests_today": {
+        "name": "API requests today"
+      },
+      "api_requests_remaining": {
+        "name": "API requests remaining"
       }
     },
     "binary_sensor": {
@@ -72,6 +78,9 @@
       },
       "flight_landed": {
         "name": "Flight landed"
+      },
+      "api_budget_exhausted": {
+        "name": "API budget exhausted"
       }
     },
     "device_tracker": {

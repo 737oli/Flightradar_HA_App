@@ -13,17 +13,44 @@ The parser is tuned for KLC-style roster events such as `KL1327 AMS-KRK` and `DH
 - `sensor.<name>_trip_timeline`
 - `sensor.<name>_travel_status`
 - `sensor.<name>_tracked_flights`
+- `sensor.<name>_api_requests_today`
+- `sensor.<name>_api_requests_remaining`
 - `binary_sensor.<name>_flight_active`
 - `binary_sensor.<name>_flight_airborne`
 - `binary_sensor.<name>_flight_arriving_soon`
 - `binary_sensor.<name>_flight_delayed`
 - `binary_sensor.<name>_flight_landed`
+- `binary_sensor.<name>_api_budget_exhausted`
 - `device_tracker.<name>_flight_location`
 - A Lovelace custom card at `/flight_tracker_static/flight-tracker-card.js`
 
 The `device_tracker` entity only has GPS coordinates when live trajectory data is available from the Air France-KLM Flight Status API. Live status is requested from one hour before scheduled departure until one hour after scheduled arrival. An Air France-KLM Open Data API key is required during setup.
 
-## Installation
+## Installation With HACS
+
+This repository can be installed directly from GitHub with HACS as a custom integration.
+
+1. In Home Assistant, open **HACS**.
+2. Open the three-dot menu in the top-right corner.
+3. Select **Custom repositories**.
+4. Add this repository URL:
+
+   ```text
+   https://github.com/737oli/Flightradar_HA_App
+   ```
+
+5. Select repository type **Integration**.
+6. Click **Add**.
+7. Open **iCal Flight Tracker** in HACS and click **Download**.
+8. Restart Home Assistant.
+9. Go to **Settings -> Devices & services -> Add integration**.
+10. Search for **iCal Flight Tracker**.
+11. Enter your private KLC roster iCal URL.
+12. Enter your Air France-KLM Open Data API key.
+
+HACS installs the integration into `/config/custom_components/flight_tracker` for you, so no manual file copy is needed.
+
+## Manual Installation
 
 1. Copy `custom_components/flight_tracker` into your Home Assistant config directory:
 
@@ -44,7 +71,7 @@ The integration serves a no-build Lovelace card that is styled after the compact
 Add this dashboard resource:
 
 ```text
-/flight_tracker_static/flight-tracker-card.js?v=0.4.1
+/flight_tracker_static/flight-tracker-card.js?v=0.5.0
 ```
 
 Resource type:
@@ -181,6 +208,18 @@ Relevant endpoints:
 The integration sends your API key in the `API-Key` header and always uses `KL` as the carrier code and consumer host.
 
 Live attributes include actual/estimated departure and arrival times, terminal/gate, aircraft registration, `typeCode`, and AF-KLM irregularity details such as delay duration, delay reason, and delay code. The bundled card treats delays of 5 minutes or less as on time and marks later positive delays in red.
+
+### API Budget Protection
+
+The integration protects the Air France-KLM limits by default:
+
+- Maximum **95 AF-KLM requests per local day**, leaving a buffer below a 100 request/day account limit.
+- Minimum **1.1 seconds between AF-KLM requests**, keeping below 1 request/second.
+- Live API calls are still limited to the live window: one hour before scheduled departure until one hour after scheduled arrival.
+- AF-KLM `flightId` values are cached per roster event, so later refreshes can call the detail endpoint directly instead of searching `/flights` every time.
+- When the daily budget is exhausted, the integration keeps calendar/timeline entities working and stops live enrichment until the next local day.
+
+Monitor the budget with `sensor.<name>_api_requests_today`, `sensor.<name>_api_requests_remaining`, and `binary_sensor.<name>_api_budget_exhausted`.
 
 ## Development
 
