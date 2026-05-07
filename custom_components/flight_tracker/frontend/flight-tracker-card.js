@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.3.3";
+const CARD_VERSION = "0.3.4";
 const EMPTY_STATES = new Set(["unknown", "unavailable", "none", "not_flying"]);
 
 class FlightTrackerCard extends HTMLElement {
@@ -584,7 +584,7 @@ function timelineStyles() {
 
       .timeline-header strong {
         color: #ffffff;
-        font-size: 30px;
+        font-size: 26px;
         line-height: 1.1;
         font-weight: 800;
       }
@@ -846,7 +846,7 @@ function timelineItem(segment) {
       </div>
       <div class="timeline-body">
         ${timelineHeading(segment)}
-        <span>${escapeHtml(segmentDetail(segment))}</span>
+        ${timelineDetail(segment)}
         ${timelineStatus(segment)}
       </div>
     </li>
@@ -864,9 +864,21 @@ function timelineHeading(segment) {
 
 function segmentDetail(segment) {
   if (segment.kind === "flight") {
-    return segment.route || segment.detail || "";
+    return timelineRoute(segment.route || segment.detail || "");
   }
   return segment.detail || segment.route || "";
+}
+
+function timelineDetail(segment) {
+  const detail = segmentDetail(segment);
+  return detail ? `<span>${escapeHtml(detail)}</span>` : "";
+}
+
+function timelineRoute(value) {
+  return String(value || "")
+    .replace(/\s*(?:->|→)\s*/g, " - ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function timelineStatus(segment) {

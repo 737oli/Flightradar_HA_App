@@ -80,7 +80,8 @@ END:VCALENDAR
         datetime(2026, 1, 24, 19, 0, tzinfo=timezone.utc),
     )
 
-    assert timeline.headline == "Travel day: BIO -> STR"
+    assert timeline.headline == "Travel day"
+    assert timeline.detail == "2 flights · Hotel Stuttgart"
     assert timeline.native_value == "Layover AMS"
     assert [segment["kind"] for segment in timeline.segments] == [
         "flight",
@@ -155,7 +156,8 @@ END:VCALENDAR
         datetime(2026, 1, 24, 17, 20, tzinfo=timezone.utc),
     )
 
-    assert timeline.headline == "Travel day: AMS -> DBV"
+    assert timeline.headline == "Travel day"
+    assert timeline.detail == "3 flights · Hotel Dubrovnik"
     assert timeline.native_value == "Omdraai: 00:45"
     assert [segment["kind"] for segment in timeline.segments] == [
         "flight",
@@ -216,7 +218,7 @@ END:VCALENDAR
     assert segment["scheduled_end"] == "2026-01-24T17:10:00+00:00"
     assert segment["departure_time_delta_minutes"] == 8
     assert segment["arrival_time_delta_minutes"] == -4
-    assert segment["detail"] == "AMS -> KRK · E195"
+    assert segment["detail"] == "AMS - KRK · E195"
 
 
 def test_trip_timeline_adds_base_return_after_final_ams_arrival():
@@ -259,10 +261,12 @@ END:VCALENDAR
         datetime(2026, 1, 25, 20, 50, tzinfo=timezone.utc),
     )
 
-    assert timeline.native_value == "Back at base"
+    assert timeline.native_value == "Back at Amsterdam"
     assert timeline.destination == "AMS"
     assert timeline.current_segment["kind"] == "base_return"
     assert timeline.current_segment["airport"] == "AMS"
+    assert timeline.current_segment["title"] == "Back at Amsterdam"
+    assert timeline.current_segment["detail"] == ""
     assert timeline.detail == "3 flights · base return"
 
 
@@ -314,3 +318,6 @@ END:VCALENDAR
         "flight",
         "base_return",
     ]
+    assert timeline.segments[1]["title"] == "Taxi"
+    assert timeline.segments[1]["detail"] == ""
+    assert timeline.detail == "Hotel Stuttgart · 1 flight · base return"

@@ -12,6 +12,18 @@ from .calendar import RosterEvent
 BASE_AIRPORT = "AMS"
 LAYOVER_MINIMUM = timedelta(minutes=20)
 BASE_RETURN_MINIMUM = timedelta(minutes=10)
+AIRPORT_DISPLAY_NAMES = {
+    "AMS": "Amsterdam",
+    "BIO": "Bilbao",
+    "BRU": "Brussels",
+    "DBV": "Dubrovnik",
+    "JFK": "New York",
+    "KRK": "Krakow",
+    "LHR": "London Heathrow",
+    "LIN": "Milan Linate",
+    "MME": "Teesside",
+    "STR": "Stuttgart",
+}
 
 
 @dataclass(frozen=True)
@@ -70,8 +82,8 @@ def build_trip_timeline(
     hotel = next((segment for segment in segments if segment["kind"] == "hotel"), None)
     has_base_return = any(segment["kind"] == "base_return" for segment in segments)
 
-    headline = _headline(flight_segments, hotel, origin, destination)
-    detail = _detail(flight_segments, hotel, has_base_return)
+    headline = _headline(segments)
+    detail = _detail(segments)
     phase = _phase(segments, now, day_start, day_end)
     native_value = _native_value(current_segment, next_flight, destination, headline)
 
@@ -328,8 +340,8 @@ def _base_return_segment(
     return _synthetic_segment(
         uid=f"base-return-{last_flight.uid}",
         kind="base_return",
-        title="Back at base",
-        detail=f"Returned to {BASE_AIRPORT}",
+        title="Back at Amsterdam",
+        detail="",
         status=_duration_label(start, end),
         start=start,
         end=end,
@@ -385,7 +397,10 @@ def _title_detail(
     """Return title and detail for a roster event."""
     if event.kind == "flight":
         prefix = f"DH/{event.flight_number}" if event.is_deadhead else event.flight_number
-        detail_parts = [event.route, status.aircraft_type if status else event.aircraft_type]
+        detail_parts = [
+            _display_route(event.route),
+            status.aircraft_type if status else event.aircraft_type,
+        ]
         return prefix or event.title, " · ".join(part for part in detail_parts if part)
     if event.kind == "hotel":
         place = f" in {event.airport}" if event.airport else ""
@@ -393,7 +408,7 @@ def _title_detail(
     if event.kind == "ground_time":
         return event.title, event.location or "Ground time"
     if event.kind == "transfer":
-        return event.title, "Transfer"
+        return event.title, ""
     return event.title, event.location
 
 
@@ -444,6 +459,13 @@ def _duration_label(start: datetime, end: datetime) -> str:
     if hours:
         return f"{hours}h"
     return f"{remainder}m"
+
+
+def _display_route(route: str | None) -> str | None:
+    """Return a softer route separator for timeline display."""
+    if not route:
+        return None
+    return route.replace(" -> ", " - ")
 
 
 def _time_delta_minutes(
@@ -510,33 +532,48 @@ def _next_flight(segments: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _headline(
-    flights: list[dict[str, Any]],
-    hotel: dict[str, Any] | None,
-    origin: str | None,
-    destination: str | None,
+    segments: list[dict[str, Any]],
 ) -> str:
     """Return the timeline headline."""
-    if flights and origin and destination:
-        return f"Travel day: {origin} -> {destination}"
-    if hotel:
-        return f"Layover in {hotel.get('airport') or 'hotel'}"
-    return "Roster day"
+    return "Travel day" if segments else "Roster day"
 
 
-def _detail(
-    flights: list[dict[str, Any]],
-    hotel: dict[str, Any] | None,
-    has_base_return: bool,
-) -> str:
-    """Return a concise timeline detail."""
+def _detail(segments: list[dict[str, Any]]) -> str:
+    """Return a concise timeline detail in travel-day order."""
     parts: list[str] = []
-    if flights:
-        parts.append(f"{len(flights)} flight{'s' if len(flights) != 1 else ''}")
-    if hotel:
-        parts.append(f"hotel {hotel.get('airport')}" if hotel.get("airport") else "hotel")
-    if has_base_return:
-        parts.append("base return")
+    pending_flights = 0
+
+    def flush_flights() -> None:
+        nonlocal pending_flights
+        if pending_flights:
+            parts.append(
+                f"{pending_flights} flight{'s' if pending_flights != 1 else ''}"
+            )
+            pending_flights = 0
+
+    for segment in segments:
+        kind = segment["kind"]
+        if kind == "flight":
+            pending_flights += 1
+            continue
+        if kind in {"transfer", "ground_time", "layover"}:
+            continue
+
+        flush_flights()
+        if kind == "hotel":
+            parts.append(_hotel_detail(segment))
+        elif kind == "base_return":
+            parts.append("base return")
+
+    flush_flights()
     return " · ".join(parts) if parts else "No flights on this roster day"
+
+
+def _hotel_detail(segment: dict[str, Any]) -> str:
+    """Return a human-friendly hotel summary."""
+    airport = str(segment.get("airport") or "").upper()
+    place = AIRPORT_DISPLAY_NAMES.get(airport, airport)
+    return f"Hotel {place}" if place else "Hotel"
 
 
 def _phase(
