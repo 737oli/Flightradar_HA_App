@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, TYPE_CHECKING
 from urllib.parse import quote
 
@@ -12,7 +12,7 @@ from .calendar import FlightEvent
 if TYPE_CHECKING:
     from aiohttp import ClientSession
 
-AFKL_BASE_URL = "https://api.airfranceklm.com/opendata/flightstatus/v4"
+AFKL_BASE_URL = "https://api.airfranceklm.com/opendata/flightstatus"
 KLM_CARRIER_CODE = "KL"
 RequestGuard = Callable[[], Awaitable[None]]
 
@@ -100,81 +100,28 @@ class AirFranceKlmClient:
         if event.airline_code.upper() != KLM_CARRIER_CODE:
             return None
 
-        if cached_flight_id:
+        flight_ids = _candidate_flight_ids(event, cached_flight_id)
+        if not flight_ids:
+            return None
+
+        for index, flight_id in enumerate(flight_ids):
             try:
-                detailed = await self._async_detail_by_id(cached_flight_id, event)
+                data = await self._async_detail_by_id(flight_id)
             except AirFranceKlmRequestBlocked:
                 raise
             except Exception:  # noqa: BLE001
-                detailed = None
-            if detailed:
-                return _status_from_flight(event, detailed)
+                if index == len(flight_ids) - 1:
+                    raise
+                continue
+            if data:
+                return _status_from_flight(event, data)
+        return None
 
-        data = await self._request(
-            "/flights",
-            {
-                "startRange": _utc_iso(event.start - timedelta(hours=8)),
-                "endRange": _utc_iso(event.start + timedelta(hours=12)),
-                "movementType": "D",
-                "timeOriginType": "S",
-                "timeType": "U",
-                "origin": event.departure_airport,
-                "destination": event.arrival_airport,
-                "carrierCode": KLM_CARRIER_CODE,
-                "flightNumber": _numeric_flight_number(event.flight_number),
-                "pageSize": 10,
-                "pageNumber": 0,
-                "consumerHost": self._consumer_host,
-            },
-        )
-        flights = _flight_list(data)
-        if not flights:
-            return None
-
-        best = min(
-            flights,
-            key=lambda flight: _time_distance(
-                _scheduled_departure(flight),
-                event.start,
-            ),
-        )
-        try:
-            detailed = await self._async_detail(best, event)
-        except AirFranceKlmRequestBlocked:
-            return _status_from_flight(event, best)
-        except Exception:  # noqa: BLE001
-            detailed = None
-        return _status_from_flight(event, detailed or best)
-
-    async def _async_detail(
-        self, flight: dict[str, Any], event: FlightEvent
-    ) -> dict[str, Any] | None:
-        """Fetch detailed flight status, including trajectory when available."""
-        flight_id = flight.get("id")
-        if not flight_id:
-            return None
-
+    async def _async_detail_by_id(self, flight_id: str) -> dict[str, Any] | None:
+        """Fetch detailed flight status directly from a flight id."""
         data = await self._request(
             _flight_detail_path(flight_id),
-            {
-                "origin": event.departure_airport,
-                "expand": "trajectory",
-                "consumerHost": self._consumer_host,
-            },
-        )
-        return data if isinstance(data, dict) else None
-
-    async def _async_detail_by_id(
-        self, flight_id: str, event: FlightEvent
-    ) -> dict[str, Any] | None:
-        """Fetch detailed flight status directly from a cached flight id."""
-        data = await self._request(
-            _flight_detail_path(flight_id),
-            {
-                "origin": event.departure_airport,
-                "expand": "trajectory",
-                "consumerHost": self._consumer_host,
-            },
+            {},
         )
         return data if isinstance(data, dict) else None
 
@@ -204,7 +151,29 @@ class AirFranceKlmClient:
 
 def _flight_detail_path(flight_id: str) -> str:
     """Return the encoded AF-KLM detail path for a flight id."""
-    return f"/flights/{quote(str(flight_id), safe='')}"
+    return f"/{quote(str(flight_id), safe='')}"
+
+
+def _candidate_flight_ids(
+    event: FlightEvent,
+    cached_flight_id: str | None = None,
+) -> list[str]:
+    """Return exact AF-KLM flight status ids to try."""
+    generated = _flight_status_id(event)
+    ids = [flight_id for flight_id in (cached_flight_id, generated) if flight_id]
+    return list(dict.fromkeys(ids))
+
+
+def _flight_status_id(event: FlightEvent) -> str | None:
+    """Return the documented AF-KLM flight status id for a calendar flight."""
+    if not event.flight_number:
+        return None
+    schedule_date = event.start.astimezone(timezone.utc).strftime("%Y%m%d")
+    return (
+        f"{schedule_date}+{KLM_CARRIER_CODE}+"
+        f"{_numeric_flight_number(event.flight_number)}"
+        f"{_operational_suffix(event.flight_number)}"
+    )
 
 
 def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightStatus:
@@ -313,21 +282,6 @@ def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightSta
     )
 
 
-def _flight_list(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return a list of operational flights from a response."""
-    flights = data.get("operationalFlights")
-    if isinstance(flights, list):
-        return [flight for flight in flights if isinstance(flight, dict)]
-
-    embedded = data.get("_embedded")
-    if isinstance(embedded, dict):
-        for value in embedded.values():
-            if isinstance(value, list):
-                return [flight for flight in value if isinstance(flight, dict)]
-
-    return []
-
-
 def _first_leg(flight: dict[str, Any]) -> dict[str, Any]:
     """Return the first flight leg."""
     legs = flight.get("flightLegs")
@@ -336,13 +290,6 @@ def _first_leg(flight: dict[str, Any]) -> dict[str, Any]:
             if isinstance(leg, dict):
                 return leg
     return {}
-
-
-def _scheduled_departure(flight: dict[str, Any]) -> datetime | None:
-    """Return the scheduled departure datetime for sorting."""
-    leg = _first_leg(flight)
-    departure = _get_dict(leg, "departureInformation")
-    return _parse_datetime(_get_dict(departure, "times").get("scheduled"))
 
 
 def _latest_trajectory(leg: dict[str, Any]) -> dict[str, Any]:
@@ -383,11 +330,12 @@ def _numeric_flight_number(flight_number: str) -> str:
     return digits.zfill(4) if digits else flight_number
 
 
-def _utc_iso(value: datetime) -> str:
-    """Return a UTC ISO timestamp with Z suffix."""
-    return value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace(
-        "+00:00", "Z"
-    )
+def _operational_suffix(flight_number: str) -> str:
+    """Return an optional operational suffix from a flight number."""
+    suffix = "".join(char for char in flight_number.upper() if char.isalpha())
+    if suffix.startswith(KLM_CARRIER_CODE):
+        suffix = suffix[len(KLM_CARRIER_CODE) :]
+    return suffix[:1]
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -413,13 +361,6 @@ def _estimated_value(value: Any) -> Any:
     if isinstance(value, dict):
         return value.get("value")
     return value
-
-
-def _time_distance(candidate: datetime | None, target: datetime) -> float:
-    """Return absolute seconds between two datetimes."""
-    if candidate is None:
-        return float("inf")
-    return abs((candidate - target.astimezone(candidate.tzinfo)).total_seconds())
 
 
 def _delay_minutes(scheduled: datetime | None, actual: datetime | None) -> int | None:

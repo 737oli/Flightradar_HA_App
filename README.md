@@ -202,10 +202,9 @@ The Air France-KLM Flight Status API is required. This integration limits live e
 
 Relevant endpoints:
 
-- `GET https://api.airfranceklm.com/opendata/flightstatus/v4/flights`
-- `GET https://api.airfranceklm.com/opendata/flightstatus/v4/flights/{flightId}`
+- `GET https://api.airfranceklm.com/opendata/flightstatus/{flightId}`
 
-The integration sends your API key in the `API-Key` header and always uses `KL` as the carrier code and consumer host.
+The integration builds the AF-KLM `flightId` directly from the roster flight using the documented format `yyyyMMdd+KL+dddd`, where the date is the UTC scheduled departure date and the flight number is four digits long. For example, `KL1327` on May 6, 2026 becomes `20260506+KL+1327`. The integration sends your API key in the `API-Key` header and always uses `KL` as the travel host.
 
 Live attributes include actual/estimated departure and arrival times, terminal/gate, aircraft registration, `typeCode`, and AF-KLM irregularity details such as delay duration, delay reason, and delay code. The bundled card treats delays of 5 minutes or less as on time and marks later positive delays in red.
 
@@ -216,7 +215,7 @@ The integration protects the Air France-KLM limits by default:
 - Maximum **95 AF-KLM requests per local day**, leaving a buffer below a 100 request/day account limit.
 - Minimum **1.1 seconds between AF-KLM requests**, keeping below 1 request/second.
 - Live API calls are still limited to the live window: one hour before scheduled departure until one hour after scheduled arrival.
-- AF-KLM `flightId` values are cached per roster event, so later refreshes can call the detail endpoint directly instead of searching `/flights` every time.
+- AF-KLM `flightId` values are generated directly from the roster event, so live refreshes use one exact status lookup per flight instead of searching a broad `/flights` range first.
 - When the daily budget is exhausted, the integration keeps calendar/timeline entities working and stops live enrichment until the next local day.
 
 Monitor the budget with `sensor.<name>_api_requests_today`, `sensor.<name>_api_requests_remaining`, and `binary_sensor.<name>_api_budget_exhausted`.

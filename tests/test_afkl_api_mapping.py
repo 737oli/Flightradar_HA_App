@@ -34,6 +34,7 @@ api_module = load_module("custom_components.flight_tracker.api", PACKAGE_PATH / 
 
 FlightEvent = calendar_module.FlightEvent
 _numeric_flight_number = api_module._numeric_flight_number
+_flight_status_id = api_module._flight_status_id
 _status_from_flight = api_module._status_from_flight
 AirFranceKlmClient = api_module.AirFranceKlmClient
 AFKL_BASE_URL = api_module.AFKL_BASE_URL
@@ -42,6 +43,42 @@ AFKL_BASE_URL = api_module.AFKL_BASE_URL
 def test_numeric_flight_number_is_padded_for_afkl_query():
     assert _numeric_flight_number("KL1327") == "1327"
     assert _numeric_flight_number("KL 643") == "0643"
+
+
+def test_flight_status_id_uses_documented_direct_lookup_format():
+    event = FlightEvent(
+        uid="flight-id",
+        summary="KL643 AMS-JFK",
+        description="",
+        location="",
+        start=datetime(2026, 5, 6, 22, 20, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 7, 6, 10, tzinfo=timezone.utc),
+        flight_number="KL643",
+        airline_code="KL",
+        departure_airport="AMS",
+        arrival_airport="JFK",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+
+    assert _flight_status_id(event) == "20260506+KL+0643"
+
+    krk_event = FlightEvent(
+        uid="flight-id-krk",
+        summary="KL1327 AMS-KRK",
+        description="",
+        location="",
+        start=datetime(2026, 5, 6, 13, 20, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 6, 15, 10, tzinfo=timezone.utc),
+        flight_number="KL1327",
+        airline_code="KL",
+        departure_airport="AMS",
+        arrival_airport="KRK",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+
+    assert _flight_status_id(krk_event) == "20260506+KL+1327"
 
 
 def test_status_from_afkl_flight_maps_live_attributes():
@@ -148,7 +185,7 @@ def test_status_from_afkl_flight_maps_live_attributes():
     assert status.altitude_ft == 31000
 
 
-def test_afkl_client_uses_v4_flights_endpoint_and_api_key_header():
+def test_afkl_client_uses_direct_flight_status_endpoint_and_api_key_header():
     event = FlightEvent(
         uid="flight-2",
         summary="KL0643 AMS-JFK",
@@ -165,22 +202,6 @@ def test_afkl_client_uses_v4_flights_endpoint_and_api_key_header():
     )
     session = FakeSession(
         [
-            {
-                "operationalFlights": [
-                    {
-                        "id": "20260506+KL+0643",
-                        "flightLegs": [
-                            {
-                                "departureInformation": {
-                                    "times": {
-                                        "scheduled": "2026-05-06T13:20:00Z",
-                                    }
-                                }
-                            }
-                        ],
-                    }
-                ]
-            },
             {
                 "id": "20260506+KL+0643",
                 "flightLegs": [
@@ -206,13 +227,11 @@ def test_afkl_client_uses_v4_flights_endpoint_and_api_key_header():
     )
 
     assert status.provider_flight_id == "20260506+KL+0643"
-    assert session.calls[0]["url"] == f"{AFKL_BASE_URL}/flights"
+    assert len(session.calls) == 1
+    assert session.calls[0]["url"] == f"{AFKL_BASE_URL}/20260506%2BKL%2B0643"
     assert session.calls[0]["headers"]["API-Key"] == "secret-key"
     assert session.calls[0]["headers"]["afkl-travel-host"] == "KL"
-    assert session.calls[0]["params"]["consumerHost"] == "KL"
-    assert session.calls[0]["params"]["carrierCode"] == "KL"
-    assert session.calls[0]["params"]["flightNumber"] == "0643"
-    assert session.calls[1]["url"] == f"{AFKL_BASE_URL}/flights/20260506%2BKL%2B0643"
+    assert session.calls[0]["params"] == {}
 
 
 def test_afkl_client_ignores_non_kl_events():
@@ -285,7 +304,7 @@ def test_afkl_client_uses_cached_flight_id_for_detail_request_only():
 
     assert status.provider_flight_id == "20260506+KL+0643"
     assert len(session.calls) == 1
-    assert session.calls[0]["url"] == f"{AFKL_BASE_URL}/flights/20260506%2BKL%2B0643"
+    assert session.calls[0]["url"] == f"{AFKL_BASE_URL}/20260506%2BKL%2B0643"
 
 
 def test_afkl_client_calls_request_guard_for_each_api_request():
@@ -305,22 +324,6 @@ def test_afkl_client_calls_request_guard_for_each_api_request():
     )
     session = FakeSession(
         [
-            {
-                "operationalFlights": [
-                    {
-                        "id": "20260506+KL+1327",
-                        "flightLegs": [
-                            {
-                                "departureInformation": {
-                                    "times": {
-                                        "scheduled": "2026-05-06T13:20:00Z",
-                                    }
-                                }
-                            }
-                        ],
-                    }
-                ]
-            },
             {
                 "id": "20260506+KL+1327",
                 "flightLegs": [
@@ -352,7 +355,7 @@ def test_afkl_client_calls_request_guard_for_each_api_request():
         ).async_get_status(event)
     )
 
-    assert guard_calls == 2
+    assert guard_calls == 1
 
 
 class FakeSession:
