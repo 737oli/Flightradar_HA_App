@@ -185,6 +185,135 @@ def test_status_from_afkl_flight_maps_live_attributes():
     assert status.altitude_ft == 31000
 
 
+def test_status_prefers_latest_public_arrival_eta_for_delay():
+    event = FlightEvent(
+        uid="flight-live-eta",
+        summary="KL1978 DBV-AMS",
+        description="",
+        location="E195",
+        start=datetime(2026, 5, 7, 11, 25, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 7, 13, 55, tzinfo=timezone.utc),
+        flight_number="KL1978",
+        airline_code="KL",
+        departure_airport="DBV",
+        arrival_airport="AMS",
+        aircraft_type="E195",
+        is_deadhead=False,
+    )
+    flight = {
+        "id": "20260507+KL+1978",
+        "flightLegs": [
+            {
+                "departureInformation": {
+                    "times": {
+                        "scheduled": "2026-05-07T11:25:00Z",
+                        "actual": "2026-05-07T11:30:00Z",
+                    }
+                },
+                "arrivalInformation": {
+                    "times": {
+                        "scheduled": "2026-05-07T13:55:00Z",
+                        "estimatedArrival": "2026-05-07T13:55:00Z",
+                        "estimatedPublic": "2026-05-07T14:10:00Z",
+                        "latestPublished": "2026-05-07T14:17:00Z",
+                    }
+                },
+            }
+        ],
+    }
+
+    status = _status_from_flight(event, flight)
+
+    assert status.estimated_arrival == datetime(
+        2026, 5, 7, 14, 17, tzinfo=timezone.utc
+    )
+    assert status.arrival_delay_minutes == 22
+
+
+def test_status_uses_arrival_irregularity_delay_when_eta_is_stale():
+    event = FlightEvent(
+        uid="flight-arrival-delay",
+        summary="KL1978 DBV-AMS",
+        description="",
+        location="E195",
+        start=datetime(2026, 5, 7, 11, 25, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 7, 13, 55, tzinfo=timezone.utc),
+        flight_number="KL1978",
+        airline_code="KL",
+        departure_airport="DBV",
+        arrival_airport="AMS",
+        aircraft_type="E195",
+        is_deadhead=False,
+    )
+    flight = {
+        "id": "20260507+KL+1978",
+        "flightLegs": [
+            {
+                "departureInformation": {
+                    "times": {"scheduled": "2026-05-07T11:25:00Z"}
+                },
+                "arrivalInformation": {
+                    "times": {
+                        "scheduled": "2026-05-07T13:55:00Z",
+                        "estimatedArrival": "2026-05-07T13:55:00Z",
+                    }
+                },
+                "irregularity": {
+                    "delayDurationArrival": "PT18M",
+                    "delayDurationPublic": "PT15M",
+                },
+            }
+        ],
+    }
+
+    status = _status_from_flight(event, flight)
+
+    assert status.arrival_delay_minutes == 18
+    assert status.delay_duration_arrival == "PT18M"
+
+
+def test_status_derives_arrival_eta_from_time_to_arrival():
+    event = FlightEvent(
+        uid="flight-time-to-arrival",
+        summary="KL1978 DBV-AMS",
+        description="",
+        location="E195",
+        start=datetime(2026, 5, 7, 11, 25, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 7, 13, 55, tzinfo=timezone.utc),
+        flight_number="KL1978",
+        airline_code="KL",
+        departure_airport="DBV",
+        arrival_airport="AMS",
+        aircraft_type="E195",
+        is_deadhead=False,
+    )
+    flight = {
+        "id": "20260507+KL+1978",
+        "flightLegs": [
+            {
+                "timeToArrival": "PT35M",
+                "departureInformation": {
+                    "times": {"scheduled": "2026-05-07T11:25:00Z"}
+                },
+                "arrivalInformation": {
+                    "times": {"scheduled": "2026-05-07T13:55:00Z"}
+                },
+            }
+        ],
+    }
+
+    status = _status_from_flight(
+        event,
+        flight,
+        observed_at=datetime(2026, 5, 7, 13, 40, tzinfo=timezone.utc),
+    )
+
+    assert status.estimated_arrival == datetime(
+        2026, 5, 7, 14, 15, tzinfo=timezone.utc
+    )
+    assert status.arrival_delay_minutes == 20
+
+
 def test_afkl_client_uses_direct_flight_status_endpoint_and_api_key_header():
     event = FlightEvent(
         uid="flight-2",

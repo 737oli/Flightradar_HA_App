@@ -54,6 +54,7 @@ def flight_attributes(
             "irregularity_delay_code": status.delay_code,
             "irregularity_delay_sub_code": status.delay_sub_code,
             "irregularity_delay_duration": status.delay_duration,
+            "irregularity_delay_duration_arrival": status.delay_duration_arrival,
             "irregularity_delay_duration_public": status.delay_duration_public,
             "irregularity_delay_reason": status.delay_reason,
             "irregularity_delay_reason_public": status.delay_reason_public,

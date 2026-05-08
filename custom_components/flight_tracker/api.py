@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, TYPE_CHECKING
 from urllib.parse import quote
 
@@ -44,6 +44,7 @@ class FlightStatus:
     delay_code: str | None = None
     delay_sub_code: str | None = None
     delay_duration: str | None = None
+    delay_duration_arrival: str | None = None
     delay_duration_public: str | None = None
     delay_reason: str | None = None
     delay_reason_public: str | None = None
@@ -176,8 +177,17 @@ def _flight_status_id(event: FlightEvent) -> str | None:
     )
 
 
-def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightStatus:
+def _status_from_flight(
+    event: FlightEvent,
+    flight: dict[str, Any],
+    observed_at: datetime | None = None,
+) -> FlightStatus:
     """Build a status object from Air France-KLM data."""
+    if observed_at is None:
+        observed_at = datetime.now(timezone.utc)
+    elif observed_at.tzinfo is None:
+        observed_at = observed_at.replace(tzinfo=timezone.utc)
+
     leg = _first_leg(flight)
     departure = _get_dict(leg, "departureInformation")
     arrival = _get_dict(leg, "arrivalInformation")
@@ -190,11 +200,16 @@ def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightSta
     delay_information = _first_dict_item(irregularity.get("delayInformation"))
     trajectory = _latest_trajectory(leg)
     location = _get_dict(trajectory, "location")
+    time_to_arrival_minutes = _duration_minutes(leg.get("timeToArrival"))
 
     scheduled_departure = _parse_datetime(departure_times.get("scheduled")) or event.start
     estimated_departure = (
         _parse_datetime(_estimated_value(departure_times.get("estimated")))
+        or _parse_datetime(departure_times.get("latestPublished"))
         or _parse_datetime(departure_times.get("estimatedPublic"))
+        or _parse_datetime(departure_times.get("modified"))
+        or _parse_datetime(departure_times.get("targetOffBlock"))
+        or _parse_datetime(departure_times.get("departureSlotTime"))
         or _parse_datetime(departure_times.get("estimatedTakeOffTime"))
     )
     actual_departure = (
@@ -203,16 +218,28 @@ def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightSta
     )
 
     scheduled_arrival = _parse_datetime(arrival_times.get("scheduled")) or event.end
-    estimated_arrival = (
-        _parse_datetime(_estimated_value(arrival_times.get("estimated")))
-        or _parse_datetime(arrival_times.get("estimatedArrival"))
-        or _parse_datetime(arrival_times.get("estimatedPublic"))
-        or _parse_datetime(arrival_times.get("estimatedTouchDownTime"))
-    )
     actual_arrival = (
         _parse_datetime(arrival_times.get("actual"))
         or _parse_datetime(arrival_times.get("aircraftOnPosition"))
-        or _parse_datetime(arrival_times.get("actualTouchDownTime"))
+    )
+    time_to_arrival_eta = (
+        observed_at.astimezone(timezone.utc) + timedelta(minutes=time_to_arrival_minutes)
+        if time_to_arrival_minutes is not None and actual_arrival is None
+        else None
+    )
+    estimated_arrival = (
+        _parse_datetime(_estimated_value(arrival_times.get("estimated")))
+        or _parse_datetime(arrival_times.get("latestPublished"))
+        or _parse_datetime(arrival_times.get("estimatedPublic"))
+        or _parse_datetime(arrival_times.get("estimatedArrival"))
+        or _parse_datetime(arrival_times.get("estimatedInternal"))
+        or _parse_datetime(arrival_times.get("modified"))
+        or time_to_arrival_eta
+        or _parse_datetime(arrival_times.get("estimatedTouchDownTime"))
+    )
+    arrival_delay = _first_integer(
+        _duration_minutes(irregularity.get("delayDurationArrival")),
+        _delay_minutes(scheduled_arrival, actual_arrival or estimated_arrival),
     )
 
     return FlightStatus(
@@ -227,9 +254,7 @@ def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightSta
         departure_delay_minutes=_delay_minutes(
             scheduled_departure, actual_departure or estimated_departure
         ),
-        arrival_delay_minutes=_delay_minutes(
-            scheduled_arrival, actual_arrival or estimated_arrival
-        ),
+        arrival_delay_minutes=arrival_delay,
         departure_terminal=_first_string(
             departure_places.get("terminalCode"),
             departure_places.get("departureTerminal"),
@@ -256,6 +281,7 @@ def _status_from_flight(event: FlightEvent, flight: dict[str, Any]) -> FlightSta
             delay_information.get("delayDuration"),
             _first_list_item(irregularity.get("delayDuration")),
         ),
+        delay_duration_arrival=_first_string(irregularity.get("delayDurationArrival")),
         delay_duration_public=_first_string(irregularity.get("delayDurationPublic")),
         delay_reason=_first_string(
             delay_information.get("delayReason"),
@@ -370,6 +396,51 @@ def _delay_minutes(scheduled: datetime | None, actual: datetime | None) -> int |
     return round((actual - scheduled).total_seconds() / 60)
 
 
+def _duration_minutes(value: Any) -> int | None:
+    """Return minutes from an AF-KLM duration value."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return round(float(value))
+
+    text = str(value).strip().upper()
+    if not text:
+        return None
+    if text.lstrip("+-").isdigit():
+        return int(text)
+
+    sign = -1 if text.startswith("-") else 1
+    text = text.lstrip("+-")
+    if not text.startswith("P"):
+        return None
+
+    date_part, _, time_part = text[1:].partition("T")
+    total = 0.0
+    number = ""
+    for char in date_part:
+        if char.isdigit() or char == ".":
+            number += char
+        elif char == "D" and number:
+            total += float(number) * 24 * 60
+            number = ""
+
+    number = ""
+    for char in time_part:
+        if char.isdigit() or char == ".":
+            number += char
+        elif char == "H" and number:
+            total += float(number) * 60
+            number = ""
+        elif char == "M" and number:
+            total += float(number)
+            number = ""
+        elif char == "S" and number:
+            total += float(number) / 60
+            number = ""
+
+    return sign * round(total)
+
+
 def _get_dict(data: dict[str, Any] | None, key: str) -> dict[str, Any]:
     """Safely read a nested dict."""
     if not data:
@@ -409,6 +480,14 @@ def _first_string(*values: Any) -> str | None:
     for value in values:
         if value:
             return str(value)
+    return None
+
+
+def _first_integer(*values: int | None) -> int | None:
+    """Return the first integer value, allowing zero."""
+    for value in values:
+        if value is not None:
+            return value
     return None
 
 
