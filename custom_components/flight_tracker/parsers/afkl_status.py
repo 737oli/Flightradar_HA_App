@@ -21,17 +21,55 @@ def status_from_flight(
         observed_at = observed_at.replace(tzinfo=timezone.utc)
 
     leg = _first_leg(flight)
+    time_data = _extract_time_data(event, leg, observed_at)
+    places_data = _extract_place_data(leg)
+    aircraft_data = _extract_aircraft_data(leg)
+    irregularity_data = _extract_irregularity_data(leg)
+    trajectory_data = _extract_trajectory_data(leg)
+
+    return FlightStatus(
+        ident=event.flight_number or str(flight.get("id") or ""),
+        source="airfranceklm",
+        status=_status_text(flight, leg),
+        provider_flight_id=_string(flight.get("id")),
+        actual_departure=time_data["actual_departure"],
+        estimated_departure=time_data["estimated_departure"],
+        actual_arrival=time_data["actual_arrival"],
+        estimated_arrival=time_data["estimated_arrival"],
+        departure_delay_minutes=time_data["departure_delay_minutes"],
+        arrival_delay_minutes=time_data["arrival_delay_minutes"],
+        departure_terminal=places_data["departure_terminal"],
+        departure_gate=places_data["departure_gate"],
+        arrival_terminal=places_data["arrival_terminal"],
+        arrival_gate=places_data["arrival_gate"],
+        aircraft_registration=aircraft_data["aircraft_registration"],
+        aircraft_type=aircraft_data["aircraft_type"],
+        delay_code=irregularity_data["delay_code"],
+        delay_sub_code=irregularity_data["delay_sub_code"],
+        delay_duration=irregularity_data["delay_duration"],
+        delay_duration_arrival=irregularity_data["delay_duration_arrival"],
+        delay_duration_public=irregularity_data["delay_duration_public"],
+        delay_reason=irregularity_data["delay_reason"],
+        delay_reason_public=irregularity_data["delay_reason_public"],
+        delay_reason_code_public=irregularity_data["delay_reason_code_public"],
+        public_disruption_reason=irregularity_data["public_disruption_reason"],
+        latitude=trajectory_data["latitude"],
+        longitude=trajectory_data["longitude"],
+        altitude_ft=trajectory_data["altitude_ft"],
+        progress_percent=trajectory_data["progress_percent"],
+        position_time=trajectory_data["position_time"],
+    )
+
+
+def _extract_time_data(
+    event: FlightEvent, leg: dict[str, Any], observed_at: datetime
+) -> dict[str, datetime | int | None]:
+    """Extract departure/arrival times and delay values."""
     departure = _get_dict(leg, "departureInformation")
     arrival = _get_dict(leg, "arrivalInformation")
     departure_times = _get_dict(departure, "times")
     arrival_times = _get_dict(arrival, "times")
-    departure_places = _get_dict(_get_dict(departure, "airport"), "places")
-    arrival_places = _get_dict(_get_dict(arrival, "airport"), "places")
-    aircraft = _get_dict(leg, "aircraft")
     irregularity = _get_dict(leg, "irregularity")
-    delay_information = _first_dict_item(irregularity.get("delayInformation"))
-    trajectory = _latest_trajectory(leg)
-    location = _get_dict(trajectory, "location")
     time_to_arrival_minutes = _duration_minutes(leg.get("timeToArrival"))
 
     scheduled_departure = (
@@ -71,75 +109,102 @@ def status_from_flight(
         or time_to_arrival_eta
         or _parse_datetime(arrival_times.get("estimatedTouchDownTime"))
     )
-    arrival_delay = _first_integer(
-        _duration_minutes(irregularity.get("delayDurationArrival")),
-        _delay_minutes(scheduled_arrival, actual_arrival or estimated_arrival),
-    )
-
-    return FlightStatus(
-        ident=event.flight_number or str(flight.get("id") or ""),
-        source="airfranceklm",
-        status=_status_text(flight, leg),
-        provider_flight_id=_string(flight.get("id")),
-        actual_departure=actual_departure,
-        estimated_departure=estimated_departure,
-        actual_arrival=actual_arrival,
-        estimated_arrival=estimated_arrival,
-        departure_delay_minutes=_delay_minutes(
+    return {
+        "actual_departure": actual_departure,
+        "estimated_departure": estimated_departure,
+        "actual_arrival": actual_arrival,
+        "estimated_arrival": estimated_arrival,
+        "departure_delay_minutes": _delay_minutes(
             scheduled_departure, actual_departure or estimated_departure
         ),
-        arrival_delay_minutes=arrival_delay,
-        departure_terminal=_first_string(
+        "arrival_delay_minutes": _first_integer(
+            _duration_minutes(irregularity.get("delayDurationArrival")),
+            _delay_minutes(scheduled_arrival, actual_arrival or estimated_arrival),
+        ),
+    }
+
+
+def _extract_place_data(leg: dict[str, Any]) -> dict[str, str | None]:
+    """Extract departure and arrival place fields."""
+    departure = _get_dict(leg, "departureInformation")
+    arrival = _get_dict(leg, "arrivalInformation")
+    departure_places = _get_dict(_get_dict(departure, "airport"), "places")
+    arrival_places = _get_dict(_get_dict(arrival, "airport"), "places")
+    return {
+        "departure_terminal": _first_string(
             departure_places.get("terminalCode"),
             departure_places.get("departureTerminal"),
             departure_places.get("boardingTerminal"),
         ),
-        departure_gate=_first_list_item(departure_places.get("gateNumber")),
-        arrival_terminal=_first_string(
+        "departure_gate": _first_list_item(departure_places.get("gateNumber")),
+        "arrival_terminal": _first_string(
             arrival_places.get("terminalCode"),
             arrival_places.get("arrivalTerminal"),
             arrival_places.get("arrivalPositionTerminal"),
         ),
-        arrival_gate=_first_list_item(arrival_places.get("gateNumber")),
-        aircraft_registration=_string(aircraft.get("registration")),
-        aircraft_type=_first_string(aircraft.get("typeCode"), aircraft.get("typeName")),
-        delay_code=_first_string(
+        "arrival_gate": _first_list_item(arrival_places.get("gateNumber")),
+    }
+
+
+def _extract_aircraft_data(leg: dict[str, Any]) -> dict[str, str | None]:
+    """Extract aircraft fields."""
+    aircraft = _get_dict(leg, "aircraft")
+    return {
+        "aircraft_registration": _string(aircraft.get("registration")),
+        "aircraft_type": _first_string(aircraft.get("typeCode"), aircraft.get("typeName")),
+    }
+
+
+def _extract_irregularity_data(leg: dict[str, Any]) -> dict[str, str | None]:
+    """Extract irregularity and delay reason fields."""
+    irregularity = _get_dict(leg, "irregularity")
+    delay_information = _first_dict_item(irregularity.get("delayInformation"))
+    return {
+        "delay_code": _first_string(
             delay_information.get("delayCode"),
             _first_list_item(irregularity.get("delayCode")),
         ),
-        delay_sub_code=_first_string(
+        "delay_sub_code": _first_string(
             delay_information.get("delaySubCode"),
             _first_list_item(irregularity.get("delaySubCode")),
         ),
-        delay_duration=_first_string(
+        "delay_duration": _first_string(
             delay_information.get("delayDuration"),
             _first_list_item(irregularity.get("delayDuration")),
         ),
-        delay_duration_arrival=_first_string(irregularity.get("delayDurationArrival")),
-        delay_duration_public=_first_string(irregularity.get("delayDurationPublic")),
-        delay_reason=_first_string(
+        "delay_duration_arrival": _first_string(irregularity.get("delayDurationArrival")),
+        "delay_duration_public": _first_string(irregularity.get("delayDurationPublic")),
+        "delay_reason": _first_string(
             delay_information.get("delayReason"),
             _first_list_item(irregularity.get("delayReason")),
         ),
-        delay_reason_public=_first_string(
+        "delay_reason_public": _first_string(
             delay_information.get("delayReasonPublicShort"),
             delay_information.get("delayReasonPublicLong"),
             _first_list_item(irregularity.get("delayReasonPublicLangTransl")),
             _first_list_item(irregularity.get("delayReasonPublic")),
         ),
-        delay_reason_code_public=_first_string(
+        "delay_reason_code_public": _first_string(
             delay_information.get("delayReasonCodePublic"),
             _first_list_item(irregularity.get("delayReasonCodePublic")),
         ),
-        public_disruption_reason=_first_string(
+        "public_disruption_reason": _first_string(
             irregularity.get("publicDisruptionReason")
         ),
-        latitude=_number(location, "latitude"),
-        longitude=_number(location, "longitude"),
-        altitude_ft=_integer(location, "altitude"),
-        progress_percent=_integer(leg, "completionPercentage"),
-        position_time=_parse_datetime(trajectory.get("aircraftPositionTime")),
-    )
+    }
+
+
+def _extract_trajectory_data(leg: dict[str, Any]) -> dict[str, datetime | float | int | None]:
+    """Extract trajectory and position fields."""
+    trajectory = _latest_trajectory(leg)
+    location = _get_dict(trajectory, "location")
+    return {
+        "latitude": _number(location, "latitude"),
+        "longitude": _number(location, "longitude"),
+        "altitude_ft": _integer(location, "altitude"),
+        "progress_percent": _integer(leg, "completionPercentage"),
+        "position_time": _parse_datetime(trajectory.get("aircraftPositionTime")),
+    }
 
 
 def _first_leg(flight: dict[str, Any]) -> dict[str, Any]:
