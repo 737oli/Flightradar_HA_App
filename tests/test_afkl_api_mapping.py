@@ -11,6 +11,41 @@ from custom_components.flight_tracker.models.flight import FlightEvent
 from custom_components.flight_tracker.parsers.afkl_status import status_from_flight
 
 
+PARTIAL_AFKL_RESPONSE_FIXTURE = {
+    "id": "20260508+KL+1978",
+    "flightLegs": [
+        {
+            "departureInformation": None,
+            "arrivalInformation": {"airport": {"places": None}, "times": None},
+            "aircraft": None,
+            "irregularity": None,
+            "trajectories": [None, {"aircraftPositionTime": "bad-date", "location": None}],
+        }
+    ],
+}
+
+IRREGULARITY_DIRECT_FIELDS_FIXTURE = {
+    "id": "20260508+KL+1978",
+    "flightLegs": [
+        {
+            "departureInformation": {"times": {"scheduled": "2026-05-08T11:25:00Z"}},
+            "arrivalInformation": {"times": {"scheduled": "2026-05-08T13:55:00Z"}},
+            "irregularity": {
+                "delayCode": ["89"],
+                "delaySubCode": ["B"],
+                "delayDuration": ["PT27M"],
+                "delayDurationArrival": "PT31M",
+                "delayDurationPublic": "PT30M",
+                "delayReason": ["CREW"],
+                "delayReasonPublicLangTransl": ["Crew availability"],
+                "delayReasonCodePublic": ["AIRLINE"],
+                "publicDisruptionReason": "Operational constraints",
+            },
+        }
+    ],
+}
+
+
 def test_numeric_flight_number_is_padded_for_afkl_query():
     assert _numeric_flight_number("KL1327") == "1327"
     assert _numeric_flight_number("KL 643") == "0643"
@@ -283,6 +318,63 @@ def test_status_derives_arrival_eta_from_time_to_arrival():
         2026, 5, 7, 14, 15, tzinfo=timezone.utc
     )
     assert status.arrival_delay_minutes == 20
+
+
+def test_status_handles_missing_nested_objects_without_crashing():
+    event = FlightEvent(
+        uid="flight-partial",
+        summary="KL1978 DBV-AMS",
+        description="",
+        location="",
+        start=datetime(2026, 5, 8, 11, 25, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 8, 13, 55, tzinfo=timezone.utc),
+        flight_number="KL1978",
+        airline_code="KL",
+        departure_airport="DBV",
+        arrival_airport="AMS",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+
+    status = status_from_flight(event, PARTIAL_AFKL_RESPONSE_FIXTURE)
+
+    assert status.provider_flight_id == "20260508+KL+1978"
+    assert status.actual_departure is None
+    assert status.estimated_arrival is None
+    assert status.departure_terminal is None
+    assert status.arrival_gate is None
+    assert status.delay_reason_public is None
+    assert status.latitude is None
+
+
+def test_status_extracts_irregularity_from_direct_fields():
+    event = FlightEvent(
+        uid="flight-direct-irregularity",
+        summary="KL1978 DBV-AMS",
+        description="",
+        location="",
+        start=datetime(2026, 5, 8, 11, 25, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 8, 13, 55, tzinfo=timezone.utc),
+        flight_number="KL1978",
+        airline_code="KL",
+        departure_airport="DBV",
+        arrival_airport="AMS",
+        aircraft_type=None,
+        is_deadhead=False,
+    )
+
+    status = status_from_flight(event, IRREGULARITY_DIRECT_FIELDS_FIXTURE)
+
+    assert status.delay_code == "89"
+    assert status.delay_sub_code == "B"
+    assert status.delay_duration == "PT27M"
+    assert status.delay_duration_arrival == "PT31M"
+    assert status.delay_duration_public == "PT30M"
+    assert status.delay_reason == "CREW"
+    assert status.delay_reason_public == "Crew availability"
+    assert status.delay_reason_code_public == "AIRLINE"
+    assert status.public_disruption_reason == "Operational constraints"
+    assert status.arrival_delay_minutes == 31
 
 
 def test_afkl_client_uses_direct_flight_status_endpoint_and_api_key_header():
