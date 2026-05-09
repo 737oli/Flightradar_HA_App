@@ -20,9 +20,14 @@ clients = sys.modules.setdefault(
     "custom_components.flight_tracker.clients",
     ModuleType("custom_components.flight_tracker.clients"),
 )
+storage = sys.modules.setdefault(
+    "custom_components.flight_tracker.storage",
+    ModuleType("custom_components.flight_tracker.storage"),
+)
 custom_components.__path__ = [str(ROOT / "custom_components")]
 flight_tracker.__path__ = [str(PACKAGE_PATH)]
 clients.__path__ = [str(PACKAGE_PATH / "clients")]
+storage.__path__ = [str(PACKAGE_PATH / "storage")]
 
 
 def load_module(name, path):
@@ -43,7 +48,8 @@ afkl_client_module = load_module(
     PACKAGE_PATH / "clients" / "afkl.py",
 )
 api_usage_module = load_module(
-    "custom_components.flight_tracker.api_usage", PACKAGE_PATH / "api_usage.py"
+    "custom_components.flight_tracker.storage.api_usage",
+    PACKAGE_PATH / "storage" / "api_usage.py",
 )
 
 FlightEvent = calendar_module.FlightEvent

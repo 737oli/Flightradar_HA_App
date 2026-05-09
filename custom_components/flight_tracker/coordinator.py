@@ -13,7 +13,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api_usage import ApiUsageManager
 from .clients.afkl import AirFranceKlmClient, AirFranceKlmRequestBlocked
 from .clients.calendar import IcalCalendarClient
 from .const import (
@@ -29,6 +28,7 @@ from .models.snapshot import FlightTrackerSnapshot
 from .models.status import FlightStatus
 from .parsers.ical import parse_flights
 from .parsers.roster import parse_roster_events
+from .storage.api_usage import ApiUsageManager
 
 _LOGGER = logging.getLogger(__name__)
 
