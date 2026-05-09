@@ -9,16 +9,13 @@ from typing import Any
 from icalendar import Calendar
 
 from ..models.roster import RosterEvent
-from .ical import (
+from .ical_event import (
     KLM_AIRLINE_CODE,
-    ROSTER_SUMMARY_RE,
-    _airline_code,
-    _datetime,
-    _extract_aircraft_type,
-    _extract_flight_number,
-    _extract_route,
-    _is_all_day,
-    _text,
+    event_datetime,
+    event_is_all_day,
+    event_text,
+    extract_aircraft_type,
+    extract_flight_metadata,
 )
 
 
@@ -47,36 +44,26 @@ def parse_roster_events(
 
 def _parse_roster_event(component: Any, default_tz: tzinfo) -> RosterEvent | None:
     """Parse a single iCal VEVENT into a roster event."""
-    summary = _text(component.get("summary"))
-    description = _text(component.get("description"))
-    location = _text(component.get("location"))
-    url = _text(component.get("url"))
+    summary = event_text(component.get("summary"))
+    description = event_text(component.get("description"))
+    location = event_text(component.get("location"))
+    url = event_text(component.get("url"))
     start_value = component.get("dtstart")
-    start = _datetime(start_value, default_tz)
-    end = _datetime(component.get("dtend"), default_tz)
+    start = event_datetime(start_value, default_tz)
+    end = event_datetime(component.get("dtend"), default_tz)
 
     if start is None:
         return None
     if end is None:
         end = start + timedelta(hours=2)
 
-    search_text = "\n".join([summary, description, location])
-    roster_match = ROSTER_SUMMARY_RE.search(summary.upper())
-    flight_number = _extract_flight_number(search_text)
-    airline_code = _airline_code(flight_number)
-    departure, arrival = _extract_route(search_text)
-    is_deadhead = summary.upper().startswith("DH/")
-
-    if roster_match:
-        flight_number = re.sub(r"\s+", "", roster_match.group("flight").upper())
-        airline_code = roster_match.group("airline").upper()
-        departure = roster_match.group("departure").upper()
-        arrival = roster_match.group("arrival").upper()
-        is_deadhead = bool(roster_match.group("deadhead"))
+    flight_number, airline_code, departure, arrival, is_deadhead = (
+        extract_flight_metadata(summary, description, location)
+    )
 
     kind = _event_kind(summary, flight_number, airline_code)
     airport = _event_airport(summary, kind, departure, arrival)
-    uid = _text(component.get("uid")) or f"{summary}-{start.isoformat()}"
+    uid = event_text(component.get("uid")) or f"{summary}-{start.isoformat()}"
 
     return RosterEvent(
         uid=uid,
@@ -93,9 +80,9 @@ def _parse_roster_event(component: Any, default_tz: tzinfo) -> RosterEvent | Non
         airline_code=airline_code,
         departure_airport=departure,
         arrival_airport=arrival,
-        aircraft_type=_extract_aircraft_type(location),
+        aircraft_type=extract_aircraft_type(location),
         is_deadhead=is_deadhead,
-        is_all_day=_is_all_day(start_value),
+        is_all_day=event_is_all_day(start_value),
     )
 
 
