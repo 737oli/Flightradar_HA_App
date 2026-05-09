@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from .calendar import FlightEvent
 from .parsers.afkl_status import FlightStatus
+from .parsers.ical import FlightEvent
 
 DELAY_THRESHOLD_MINUTES = 5
 BOARDING_SOON = timedelta(minutes=45)

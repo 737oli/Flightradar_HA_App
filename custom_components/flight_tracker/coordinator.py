@@ -15,8 +15,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api_usage import ApiUsageManager, ApiUsageSnapshot
-from .calendar import FlightEvent, RosterEvent, parse_flights, parse_roster_events
 from .clients.afkl import AirFranceKlmClient, AirFranceKlmRequestBlocked
+from .clients.calendar import IcalCalendarClient
 from .const import (
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
@@ -25,6 +25,8 @@ from .const import (
     DOMAIN,
 )
 from .parsers.afkl_status import FlightStatus
+from .parsers.ical import FlightEvent, parse_flights
+from .parsers.roster import RosterEvent, parse_roster_events
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +64,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         """Initialize the coordinator."""
         self.entry = entry
         self._session = session
+        self._calendar_client = IcalCalendarClient(session)
         self._api_usage = ApiUsageManager(hass, entry.entry_id)
         minutes = _entry_value(
             entry, CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
@@ -120,9 +123,7 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
     async def _async_fetch_calendar(self) -> str:
         """Download the configured iCal feed."""
         url = _entry_value(self.entry, CONF_URL, self.entry.data[CONF_URL])
-        async with self._session.get(url, timeout=20) as response:
-            response.raise_for_status()
-            return await response.text()
+        return await self._calendar_client.async_fetch(str(url))
 
     async def _async_live_statuses(
         self,

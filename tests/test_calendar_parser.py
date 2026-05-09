@@ -1,11 +1,24 @@
 from datetime import datetime, timedelta, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import ModuleType
 import sys
 
+ROOT = Path(__file__).parents[1]
+PACKAGE_PATH = ROOT / "custom_components" / "flight_tracker"
+
+custom_components = sys.modules.setdefault(
+    "custom_components", ModuleType("custom_components")
+)
+flight_tracker = sys.modules.setdefault(
+    "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
+)
+custom_components.__path__ = [str(ROOT / "custom_components")]
+flight_tracker.__path__ = [str(PACKAGE_PATH)]
+
 SPEC = spec_from_file_location(
-    "flight_tracker_calendar",
-    Path(__file__).parents[1] / "custom_components" / "flight_tracker" / "calendar.py",
+    "custom_components.flight_tracker.calendar",
+    PACKAGE_PATH / "calendar.py",
 )
 calendar_module = module_from_spec(SPEC)
 assert SPEC.loader is not None

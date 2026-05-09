@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from ..calendar import FlightEvent
+from .ical import FlightEvent
 
 
 @dataclass(frozen=True)

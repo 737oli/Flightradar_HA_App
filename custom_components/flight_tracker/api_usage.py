@@ -13,9 +13,9 @@ try:
 except ImportError:  # pragma: no cover - used by lightweight unit tests
     Store = None
 
-from .calendar import FlightEvent
 from .clients.afkl import AirFranceKlmRequestBlocked
 from .const import DOMAIN
+from .parsers.ical import FlightEvent
 
 STORAGE_VERSION = 1
 DEFAULT_DAILY_REQUEST_LIMIT = 95
