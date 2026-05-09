@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone
-from typing import Any
 
 from ..models.roster import RosterEvent
 from ..models.status import FlightStatus
-from ..models.trip_timeline import TripTimelineSummary
+from ..models.trip_timeline import TimelineSegment, TripTimelineSummary
 
 BASE_AIRPORT = "AMS"
 LAYOVER_MINIMUM = timedelta(minutes=20)
@@ -55,11 +54,11 @@ def build_trip_timeline(
     previous_flight = _previous_flight(segments)
     current_flight = _current_flight_segment(segments)
     next_flight = _next_flight(segments)
-    flight_segments = [segment for segment in segments if segment["kind"] == "flight"]
-    origin = _first_value(segment.get("departure_airport") for segment in flight_segments)
-    destination = _last_value(segment.get("arrival_airport") for segment in flight_segments)
-    hotel = next((segment for segment in segments if segment["kind"] == "hotel"), None)
-    has_base_return = any(segment["kind"] == "base_return" for segment in segments)
+    flight_segments = [segment for segment in segments if segment.kind == "flight"]
+    origin = _first_value(segment.departure_airport for segment in flight_segments)
+    destination = _last_value(segment.arrival_airport for segment in flight_segments)
+    hotel = next((segment for segment in segments if segment.kind == "hotel"), None)
+    has_base_return = any(segment.kind == "base_return" for segment in segments)
 
     headline = _headline(segments)
     detail = _detail(segments)
@@ -77,11 +76,11 @@ def build_trip_timeline(
         duty_end=duty_end,
         origin=origin,
         destination=destination,
-        segments=segments,
-        current_segment=current_segment,
-        previous_flight=previous_flight,
-        current_flight=current_flight,
-        next_flight=next_flight,
+        segments=[s.to_dict() for s in segments],
+        current_segment=current_segment.to_dict() if current_segment else None,
+        previous_flight=previous_flight.to_dict() if previous_flight else None,
+        current_flight=current_flight.to_dict() if current_flight else None,
+        next_flight=next_flight.to_dict() if next_flight else None,
     )
 
 
@@ -169,9 +168,9 @@ def _segments_from_events(
     statuses: dict[str, FlightStatus],
     now: datetime,
     duty_end: datetime | None,
-) -> list[dict[str, Any]]:
+) -> list[TimelineSegment]:
     """Return display segments with synthetic gaps/base return inserted."""
-    segments: list[dict[str, Any]] = []
+    segments: list[TimelineSegment] = []
     previous_flight: RosterEvent | None = None
 
     for event in events:
@@ -191,55 +190,58 @@ def _segments_from_events(
     if base_return:
         segments.append(base_return)
 
-    return sorted(segments, key=lambda segment: (segment["start"], segment["end"]))
+    return sorted(segments, key=lambda segment: (segment.start, segment.end))
 
 
 def _segment_from_event(
     event: RosterEvent,
     status: FlightStatus | None,
     now: datetime,
-) -> dict[str, Any]:
-    """Return a serializable timeline segment from a roster event."""
+) -> TimelineSegment:
+    """Return a typed timeline segment from a roster event."""
     start = _effective_start(event, status)
     end = _effective_end(event, status)
     title, detail = _title_detail(event, status)
-    segment = {
-        "uid": event.uid,
-        "kind": event.kind,
-        "title": title,
-        "detail": detail,
-        "status": _status_label(event, status, start, end, now),
-        "start": start.isoformat(),
-        "end": end.isoformat(),
-        "duration_minutes": _duration_minutes(start, end),
-        "phase": _segment_phase(start, end, now),
-        "airport": event.airport,
-        "flight_number": event.flight_number,
-        "route": event.route,
-        "departure_airport": event.departure_airport,
-        "arrival_airport": event.arrival_airport,
-        "aircraft_type": event.aircraft_type,
-        "is_deadhead": event.is_deadhead,
-        "url": event.url or None,
-    }
+    scheduled_start: datetime | None = None
+    scheduled_end: datetime | None = None
+    departure_time_delta_minutes: int | None = None
+    arrival_time_delta_minutes: int | None = None
     if event.kind == "flight":
-        segment.update(
-            {
-                "scheduled_start": event.start.isoformat(),
-                "scheduled_end": event.end.isoformat(),
-                "departure_time_delta_minutes": _time_delta_minutes(
-                    event.start,
-                    start,
-                    status.departure_delay_minutes if status else None,
-                ),
-                "arrival_time_delta_minutes": _time_delta_minutes(
-                    event.end,
-                    end,
-                    status.arrival_delay_minutes if status else None,
-                ),
-            }
+        scheduled_start = event.start
+        scheduled_end = event.end
+        departure_time_delta_minutes = _time_delta_minutes(
+            event.start,
+            start,
+            status.departure_delay_minutes if status else None,
         )
-    return {key: value for key, value in segment.items() if value is not None}
+        arrival_time_delta_minutes = _time_delta_minutes(
+            event.end,
+            end,
+            status.arrival_delay_minutes if status else None,
+        )
+    return TimelineSegment(
+        uid=event.uid,
+        kind=event.kind,
+        title=title,
+        detail=detail,
+        status=_status_label(event, status, start, end, now),
+        start=start,
+        end=end,
+        duration_minutes=_duration_minutes(start, end),
+        phase=_segment_phase(start, end, now),
+        airport=event.airport,
+        flight_number=event.flight_number,
+        route=event.route,
+        departure_airport=event.departure_airport,
+        arrival_airport=event.arrival_airport,
+        aircraft_type=event.aircraft_type,
+        is_deadhead=event.is_deadhead,
+        url=event.url or None,
+        scheduled_start=scheduled_start,
+        scheduled_end=scheduled_end,
+        departure_time_delta_minutes=departure_time_delta_minutes,
+        arrival_time_delta_minutes=arrival_time_delta_minutes,
+    )
 
 
 def _layover_segment(
@@ -248,7 +250,7 @@ def _layover_segment(
     events: list[RosterEvent],
     statuses: dict[str, FlightStatus],
     now: datetime,
-) -> dict[str, Any] | None:
+) -> TimelineSegment | None:
     """Return a synthetic layover segment between two flights."""
     if _has_roster_gap_segment(previous, upcoming, events):
         return None
@@ -299,7 +301,7 @@ def _base_return_segment(
     statuses: dict[str, FlightStatus],
     now: datetime,
     duty_end: datetime | None,
-) -> dict[str, Any] | None:
+) -> TimelineSegment | None:
     """Return a synthetic base return segment after the final AMS arrival."""
     flights = [event for event in events if event.kind == "flight"]
     if not flights:
@@ -339,20 +341,20 @@ def _synthetic_segment(
     end: datetime,
     now: datetime,
     airport: str | None,
-) -> dict[str, Any]:
-    """Return a serializable synthetic segment."""
-    return {
-        "uid": uid,
-        "kind": kind,
-        "title": title,
-        "detail": detail,
-        "status": status,
-        "start": start.isoformat(),
-        "end": end.isoformat(),
-        "duration_minutes": _duration_minutes(start, end),
-        "phase": _segment_phase(start, end, now),
-        "airport": airport,
-    }
+) -> TimelineSegment:
+    """Return a typed synthetic segment."""
+    return TimelineSegment(
+        uid=uid,
+        kind=kind,
+        title=title,
+        detail=detail,
+        status=status,
+        start=start,
+        end=end,
+        duration_minutes=_duration_minutes(start, end),
+        phase=_segment_phase(start, end, now),
+        airport=airport,
+    )
 
 
 def _effective_start(event: RosterEvent, status: FlightStatus | None) -> datetime:
@@ -471,53 +473,53 @@ def _max_delay(status: FlightStatus | None) -> int | None:
     return max(delays) if delays else None
 
 
-def _current_segment(segments: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _current_segment(segments: list[TimelineSegment]) -> TimelineSegment | None:
     """Return the active segment."""
-    return next((segment for segment in segments if segment["phase"] == "current"), None)
+    return next((segment for segment in segments if segment.phase == "current"), None)
 
 
-def _previous_flight(segments: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _previous_flight(segments: list[TimelineSegment]) -> TimelineSegment | None:
     """Return the latest past flight segment."""
     flights = [
         segment
         for segment in segments
-        if segment["kind"] == "flight" and segment["phase"] == "past"
+        if segment.kind == "flight" and segment.phase == "past"
     ]
     return flights[-1] if flights else None
 
 
-def _current_flight_segment(segments: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _current_flight_segment(segments: list[TimelineSegment]) -> TimelineSegment | None:
     """Return the current flight segment."""
     return next(
         (
             segment
             for segment in segments
-            if segment["kind"] == "flight" and segment["phase"] == "current"
+            if segment.kind == "flight" and segment.phase == "current"
         ),
         None,
     )
 
 
-def _next_flight(segments: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _next_flight(segments: list[TimelineSegment]) -> TimelineSegment | None:
     """Return the next upcoming flight segment."""
     return next(
         (
             segment
             for segment in segments
-            if segment["kind"] == "flight" and segment["phase"] == "next"
+            if segment.kind == "flight" and segment.phase == "next"
         ),
         None,
     )
 
 
 def _headline(
-    segments: list[dict[str, Any]],
+    segments: list[TimelineSegment],
 ) -> str:
     """Return the timeline headline."""
     return "Travel day" if segments else "Roster day"
 
 
-def _detail(segments: list[dict[str, Any]]) -> str:
+def _detail(segments: list[TimelineSegment]) -> str:
     """Return a concise timeline detail in travel-day order."""
     parts: list[str] = []
     pending_flights = 0
@@ -531,7 +533,7 @@ def _detail(segments: list[dict[str, Any]]) -> str:
             pending_flights = 0
 
     for segment in segments:
-        kind = segment["kind"]
+        kind = segment.kind
         if kind == "flight":
             pending_flights += 1
             continue
@@ -548,21 +550,21 @@ def _detail(segments: list[dict[str, Any]]) -> str:
     return " · ".join(parts) if parts else "No flights on this roster day"
 
 
-def _hotel_detail(segment: dict[str, Any]) -> str:
+def _hotel_detail(segment: TimelineSegment) -> str:
     """Return a human-friendly hotel summary."""
-    airport = str(segment.get("airport") or "").upper()
+    airport = str(segment.airport or "").upper()
     place = AIRPORT_DISPLAY_NAMES.get(airport, airport)
     return f"Hotel {place}" if place else "Hotel"
 
 
 def _phase(
-    segments: list[dict[str, Any]],
+    segments: list[TimelineSegment],
     now: datetime,
     day_start: datetime,
     day_end: datetime,
 ) -> str:
     """Return whole-day phase."""
-    if any(segment["phase"] == "current" for segment in segments):
+    if any(segment.phase == "current" for segment in segments):
         return "current"
     if now < day_start:
         return "upcoming"
@@ -572,16 +574,16 @@ def _phase(
 
 
 def _native_value(
-    current_segment: dict[str, Any] | None,
-    next_flight: dict[str, Any] | None,
+    current_segment: TimelineSegment | None,
+    next_flight: TimelineSegment | None,
     destination: str | None,
     headline: str,
 ) -> str:
     """Return the sensor state."""
     if current_segment:
-        return str(current_segment["title"])
+        return current_segment.title
     if next_flight:
-        return f"Next: {next_flight['title']}"
+        return f"Next: {next_flight.title}"
     if destination:
         return f"Done: {destination}"
     return headline
