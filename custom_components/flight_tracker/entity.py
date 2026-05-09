@@ -8,10 +8,10 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .api import FlightStatus
 from .calendar import FlightEvent
 from .const import ATTR_LAST_REFRESH, DOMAIN
 from .coordinator import FlightTrackerCoordinator
+from .parsers.afkl_status import FlightStatus
 
 
 def async_coordinator(hass: HomeAssistant, entry: ConfigEntry) -> FlightTrackerCoordinator:

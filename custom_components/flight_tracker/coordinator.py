@@ -14,9 +14,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import AirFranceKlmClient, AirFranceKlmRequestBlocked, FlightStatus
 from .api_usage import ApiUsageManager, ApiUsageSnapshot
 from .calendar import FlightEvent, RosterEvent, parse_flights, parse_roster_events
+from .clients.afkl import AirFranceKlmClient, AirFranceKlmRequestBlocked
 from .const import (
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
 )
+from .parsers.afkl_status import FlightStatus
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
 
-from .api import FlightStatus
 from .calendar import RosterEvent
+from .parsers.afkl_status import FlightStatus
 
 BASE_AIRPORT = "AMS"
 LAYOVER_MINIMUM = timedelta(minutes=20)

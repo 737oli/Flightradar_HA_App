@@ -14,12 +14,17 @@ custom_components = sys.modules.setdefault(
 flight_tracker = sys.modules.setdefault(
     "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
 )
+clients = sys.modules.setdefault(
+    "custom_components.flight_tracker.clients",
+    ModuleType("custom_components.flight_tracker.clients"),
+)
 parsers = sys.modules.setdefault(
     "custom_components.flight_tracker.parsers",
     ModuleType("custom_components.flight_tracker.parsers"),
 )
 custom_components.__path__ = [str(ROOT / "custom_components")]
 flight_tracker.__path__ = [str(PACKAGE_PATH)]
+clients.__path__ = [str(PACKAGE_PATH / "clients")]
 parsers.__path__ = [str(PACKAGE_PATH / "parsers")]
 
 
@@ -39,14 +44,17 @@ afkl_status_module = load_module(
     "custom_components.flight_tracker.parsers.afkl_status",
     PACKAGE_PATH / "parsers" / "afkl_status.py",
 )
-api_module = load_module("custom_components.flight_tracker.api", PACKAGE_PATH / "api.py")
+afkl_client_module = load_module(
+    "custom_components.flight_tracker.clients.afkl",
+    PACKAGE_PATH / "clients" / "afkl.py",
+)
 
 FlightEvent = calendar_module.FlightEvent
-_numeric_flight_number = api_module._numeric_flight_number
-_flight_status_id = api_module._flight_status_id
+_numeric_flight_number = afkl_client_module._numeric_flight_number
+_flight_status_id = afkl_client_module._flight_status_id
 status_from_flight = afkl_status_module.status_from_flight
-AirFranceKlmClient = api_module.AirFranceKlmClient
-AFKL_BASE_URL = api_module.AFKL_BASE_URL
+AirFranceKlmClient = afkl_client_module.AirFranceKlmClient
+AFKL_BASE_URL = afkl_client_module.AFKL_BASE_URL
 
 
 def test_numeric_flight_number_is_padded_for_afkl_query():

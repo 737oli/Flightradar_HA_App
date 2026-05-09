@@ -13,8 +13,8 @@ try:
 except ImportError:  # pragma: no cover - used by lightweight unit tests
     Store = None
 
-from .api import AirFranceKlmRequestBlocked
 from .calendar import FlightEvent
+from .clients.afkl import AirFranceKlmRequestBlocked
 from .const import DOMAIN
 
 STORAGE_VERSION = 1

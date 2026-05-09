@@ -16,8 +16,13 @@ custom_components = sys.modules.setdefault(
 flight_tracker = sys.modules.setdefault(
     "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
 )
+clients = sys.modules.setdefault(
+    "custom_components.flight_tracker.clients",
+    ModuleType("custom_components.flight_tracker.clients"),
+)
 custom_components.__path__ = [str(ROOT / "custom_components")]
 flight_tracker.__path__ = [str(PACKAGE_PATH)]
+clients.__path__ = [str(PACKAGE_PATH / "clients")]
 
 
 def load_module(name, path):
@@ -33,13 +38,16 @@ calendar_module = load_module(
     "custom_components.flight_tracker.calendar", PACKAGE_PATH / "calendar.py"
 )
 load_module("custom_components.flight_tracker.const", PACKAGE_PATH / "const.py")
-api_module = load_module("custom_components.flight_tracker.api", PACKAGE_PATH / "api.py")
+afkl_client_module = load_module(
+    "custom_components.flight_tracker.clients.afkl",
+    PACKAGE_PATH / "clients" / "afkl.py",
+)
 api_usage_module = load_module(
     "custom_components.flight_tracker.api_usage", PACKAGE_PATH / "api_usage.py"
 )
 
 FlightEvent = calendar_module.FlightEvent
-AirFranceKlmRequestBlocked = api_module.AirFranceKlmRequestBlocked
+AirFranceKlmRequestBlocked = afkl_client_module.AirFranceKlmRequestBlocked
 ApiUsageManager = api_usage_module.ApiUsageManager
 
 
