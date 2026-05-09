@@ -157,3 +157,24 @@ END:VCALENDAR
     )
 
     assert flights == []
+
+
+def test_roster_event_defaults_end_when_missing():
+    ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:test-6
+DTSTART:20260503T100000Z
+SUMMARY:Taxi
+END:VEVENT
+END:VCALENDAR
+"""
+
+    events = parse_roster_events(
+        ics,
+        datetime(2026, 5, 3, tzinfo=timezone.utc),
+        timedelta(days=1),
+    )
+
+    assert len(events) == 1
+    assert events[0].end == events[0].start + timedelta(hours=2)
