@@ -13,8 +13,13 @@ custom_components = sys.modules.setdefault(
 flight_tracker = sys.modules.setdefault(
     "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
 )
+services = sys.modules.setdefault(
+    "custom_components.flight_tracker.services",
+    ModuleType("custom_components.flight_tracker.services"),
+)
 custom_components.__path__ = [str(ROOT / "custom_components")]
 flight_tracker.__path__ = [str(PACKAGE_PATH)]
+services.__path__ = [str(PACKAGE_PATH / "services")]
 
 
 def load_module(name, path):
@@ -30,13 +35,14 @@ calendar_module = load_module(
     "custom_components.flight_tracker.calendar", PACKAGE_PATH / "calendar.py"
 )
 api_module = load_module("custom_components.flight_tracker.api", PACKAGE_PATH / "api.py")
-summary_module = load_module(
-    "custom_components.flight_tracker.summary", PACKAGE_PATH / "summary.py"
+travel_status_module = load_module(
+    "custom_components.flight_tracker.services.travel_status",
+    PACKAGE_PATH / "services" / "travel_status.py",
 )
 
 FlightEvent = calendar_module.FlightEvent
 FlightStatus = api_module.FlightStatus
-build_travel_status = summary_module.build_travel_status
+build_travel_status = travel_status_module.build_travel_status
 
 
 def flight_event(start, end):
