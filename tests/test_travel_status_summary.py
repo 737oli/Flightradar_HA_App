@@ -1,48 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-from types import ModuleType
-import sys
 
-ROOT = Path(__file__).parents[1]
-PACKAGE_PATH = ROOT / "custom_components" / "flight_tracker"
-
-custom_components = sys.modules.setdefault(
-    "custom_components", ModuleType("custom_components")
-)
-flight_tracker = sys.modules.setdefault(
-    "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
-)
-services = sys.modules.setdefault(
-    "custom_components.flight_tracker.services",
-    ModuleType("custom_components.flight_tracker.services"),
-)
-custom_components.__path__ = [str(ROOT / "custom_components")]
-flight_tracker.__path__ = [str(PACKAGE_PATH)]
-services.__path__ = [str(PACKAGE_PATH / "services")]
-
-
-def load_module(name, path):
-    spec = spec_from_file_location(name, path)
-    module = module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-calendar_module = load_module(
-    "custom_components.flight_tracker.calendar", PACKAGE_PATH / "calendar.py"
-)
-api_module = load_module("custom_components.flight_tracker.api", PACKAGE_PATH / "api.py")
-travel_status_module = load_module(
-    "custom_components.flight_tracker.services.travel_status",
-    PACKAGE_PATH / "services" / "travel_status.py",
-)
-
-FlightEvent = calendar_module.FlightEvent
-FlightStatus = api_module.FlightStatus
-build_travel_status = travel_status_module.build_travel_status
+from custom_components.flight_tracker.models.flight import FlightEvent
+from custom_components.flight_tracker.models.status import FlightStatus
+from custom_components.flight_tracker.services.travel_status import build_travel_status
 
 
 def flight_event(start, end):

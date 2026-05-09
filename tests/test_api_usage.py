@@ -1,60 +1,11 @@
 from datetime import datetime, timezone
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-from types import ModuleType
 import asyncio
-import sys
 
 import pytest
 
-ROOT = Path(__file__).parents[1]
-PACKAGE_PATH = ROOT / "custom_components" / "flight_tracker"
-
-custom_components = sys.modules.setdefault(
-    "custom_components", ModuleType("custom_components")
-)
-flight_tracker = sys.modules.setdefault(
-    "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
-)
-clients = sys.modules.setdefault(
-    "custom_components.flight_tracker.clients",
-    ModuleType("custom_components.flight_tracker.clients"),
-)
-storage = sys.modules.setdefault(
-    "custom_components.flight_tracker.storage",
-    ModuleType("custom_components.flight_tracker.storage"),
-)
-custom_components.__path__ = [str(ROOT / "custom_components")]
-flight_tracker.__path__ = [str(PACKAGE_PATH)]
-clients.__path__ = [str(PACKAGE_PATH / "clients")]
-storage.__path__ = [str(PACKAGE_PATH / "storage")]
-
-
-def load_module(name, path):
-    spec = spec_from_file_location(name, path)
-    module = module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-calendar_module = load_module(
-    "custom_components.flight_tracker.calendar", PACKAGE_PATH / "calendar.py"
-)
-load_module("custom_components.flight_tracker.const", PACKAGE_PATH / "const.py")
-afkl_client_module = load_module(
-    "custom_components.flight_tracker.clients.afkl",
-    PACKAGE_PATH / "clients" / "afkl.py",
-)
-api_usage_module = load_module(
-    "custom_components.flight_tracker.storage.api_usage",
-    PACKAGE_PATH / "storage" / "api_usage.py",
-)
-
-FlightEvent = calendar_module.FlightEvent
-AirFranceKlmRequestBlocked = afkl_client_module.AirFranceKlmRequestBlocked
-ApiUsageManager = api_usage_module.ApiUsageManager
+from custom_components.flight_tracker.clients.afkl import AirFranceKlmRequestBlocked
+from custom_components.flight_tracker.models.flight import FlightEvent
+from custom_components.flight_tracker.storage.api_usage import ApiUsageManager
 
 
 def test_api_usage_enforces_daily_limit_and_resets_next_day():

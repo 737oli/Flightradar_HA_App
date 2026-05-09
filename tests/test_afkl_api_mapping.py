@@ -1,60 +1,14 @@
 from datetime import datetime, timezone
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-from types import ModuleType
 import asyncio
-import sys
 
-ROOT = Path(__file__).parents[1]
-PACKAGE_PATH = ROOT / "custom_components" / "flight_tracker"
-
-custom_components = sys.modules.setdefault(
-    "custom_components", ModuleType("custom_components")
+from custom_components.flight_tracker.clients.afkl import (
+    AFKL_BASE_URL,
+    AirFranceKlmClient,
+    _flight_status_id,
+    _numeric_flight_number,
 )
-flight_tracker = sys.modules.setdefault(
-    "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
-)
-clients = sys.modules.setdefault(
-    "custom_components.flight_tracker.clients",
-    ModuleType("custom_components.flight_tracker.clients"),
-)
-parsers = sys.modules.setdefault(
-    "custom_components.flight_tracker.parsers",
-    ModuleType("custom_components.flight_tracker.parsers"),
-)
-custom_components.__path__ = [str(ROOT / "custom_components")]
-flight_tracker.__path__ = [str(PACKAGE_PATH)]
-clients.__path__ = [str(PACKAGE_PATH / "clients")]
-parsers.__path__ = [str(PACKAGE_PATH / "parsers")]
-
-
-def load_module(name, path):
-    spec = spec_from_file_location(name, path)
-    module = module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-calendar_module = load_module(
-    "custom_components.flight_tracker.calendar", PACKAGE_PATH / "calendar.py"
-)
-afkl_status_module = load_module(
-    "custom_components.flight_tracker.parsers.afkl_status",
-    PACKAGE_PATH / "parsers" / "afkl_status.py",
-)
-afkl_client_module = load_module(
-    "custom_components.flight_tracker.clients.afkl",
-    PACKAGE_PATH / "clients" / "afkl.py",
-)
-
-FlightEvent = calendar_module.FlightEvent
-_numeric_flight_number = afkl_client_module._numeric_flight_number
-_flight_status_id = afkl_client_module._flight_status_id
-status_from_flight = afkl_status_module.status_from_flight
-AirFranceKlmClient = afkl_client_module.AirFranceKlmClient
-AFKL_BASE_URL = afkl_client_module.AFKL_BASE_URL
+from custom_components.flight_tracker.models.flight import FlightEvent
+from custom_components.flight_tracker.parsers.afkl_status import status_from_flight
 
 
 def test_numeric_flight_number_is_padded_for_afkl_query():
