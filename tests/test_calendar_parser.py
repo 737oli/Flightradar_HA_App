@@ -1,31 +1,7 @@
 from datetime import datetime, timedelta, timezone
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-from types import ModuleType
-import sys
 
-ROOT = Path(__file__).parents[1]
-PACKAGE_PATH = ROOT / "custom_components" / "flight_tracker"
-
-custom_components = sys.modules.setdefault(
-    "custom_components", ModuleType("custom_components")
-)
-flight_tracker = sys.modules.setdefault(
-    "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
-)
-custom_components.__path__ = [str(ROOT / "custom_components")]
-flight_tracker.__path__ = [str(PACKAGE_PATH)]
-
-SPEC = spec_from_file_location(
-    "custom_components.flight_tracker.calendar",
-    PACKAGE_PATH / "calendar.py",
-)
-calendar_module = module_from_spec(SPEC)
-assert SPEC.loader is not None
-sys.modules[SPEC.name] = calendar_module
-SPEC.loader.exec_module(calendar_module)
-parse_flights = calendar_module.parse_flights
-parse_roster_events = calendar_module.parse_roster_events
+from custom_components.flight_tracker.parsers.ical import parse_flights
+from custom_components.flight_tracker.parsers.roster import parse_roster_events
 
 
 def test_ignores_non_kl_flight_numbers():
