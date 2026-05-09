@@ -233,3 +233,9 @@ Run tests:
 ```bash
 python3 -m pytest
 ```
+
+Run frontend helper tests:
+
+```bash
+node --test custom_components/flight_tracker/frontend/flight-tracker-card-helpers.test.mjs
+```

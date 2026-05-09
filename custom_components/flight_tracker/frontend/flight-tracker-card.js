@@ -1,3 +1,12 @@
+import {
+  irregularityText as irregularityTextHelper,
+  progressPercent as progressPercentHelper,
+  timeDeltaLabel as timeDeltaLabelHelper,
+  timelineRoute as timelineRouteHelper,
+  timelineStatusClass as timelineStatusClassHelper,
+  timelineStatusHtml as timelineStatusHtmlHelper,
+} from "./flight-tracker-card-helpers.js";
+
 const CARD_VERSION = "0.3.4";
 const EMPTY_STATES = new Set(["unknown", "unavailable", "none", "not_flying"]);
 
@@ -875,27 +884,16 @@ function timelineDetail(segment) {
 }
 
 function timelineRoute(value) {
-  return String(value || "")
-    .replace(/\s*(?:->|→)\s*/g, " - ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  return timelineRouteHelper(value);
 }
 
 function timelineStatus(segment) {
   const status = segment.status || segmentMeta(segment);
-  if (!status || ["upcoming", "done"].includes(String(status).toLowerCase())) {
-    return "";
-  }
-  const delayed = timelineStatusClass(status);
-  return `<b class="timeline-status${delayed}">${escapeHtml(status)}</b>`;
+  return timelineStatusHtmlHelper(status);
 }
 
 function timelineStatusClass(status) {
-  return String(status || "")
-    .toLowerCase()
-    .includes("delayed")
-    ? " is-delayed"
-    : "";
+  return timelineStatusClassHelper(status);
 }
 
 function timelinePhaseClass(phase) {
@@ -923,13 +921,7 @@ function timeRow(date, deltaMinutes) {
 }
 
 function timeDeltaLabel(deltaMinutes) {
-  if (!Number.isFinite(Number(deltaMinutes)) || Number(deltaMinutes) === 0) {
-    return "";
-  }
-  const minutes = Number(deltaMinutes);
-  const tone = minutes > 0 ? "is-late" : "is-early";
-  const sign = minutes > 0 ? "+" : "";
-  return `<em class="timeline-time-delta ${tone}">${sign}${minutes}m</em>`;
+  return timeDeltaLabelHelper(deltaMinutes);
 }
 
 function segmentIcon(kind) {
@@ -1021,36 +1013,7 @@ function airportStatus(terminal, gate, status) {
 }
 
 function irregularityText(attrs) {
-  const code = firstValue(
-    attrs.irregularity_delay_code,
-    attrs.irregularity_delay_reason_code_public,
-    attrs.irregularity_delay_sub_code,
-  );
-  const duration =
-    formatDelayDuration(
-      firstValue(
-        attrs.irregularity_delay_duration_public,
-        attrs.irregularity_delay_duration,
-      ),
-    ) || delayDurationFromMinutes(attrs.departure_delay_minutes, attrs.arrival_delay_minutes);
-  const reason = firstValue(
-    attrs.irregularity_delay_reason_public,
-    attrs.irregularity_public_disruption_reason,
-    attrs.irregularity_delay_reason,
-  );
-
-  if (!code && !duration && !reason) {
-    return "";
-  }
-
-  const parts = [duration ? `Delayed ${duration}` : "Delayed"];
-  if (reason) {
-    parts.push(reason);
-  }
-  if (code) {
-    parts.push(`Code ${code}`);
-  }
-  return parts.join(" · ");
+  return irregularityTextHelper(attrs);
 }
 
 function firstValue(...values) {
@@ -1100,14 +1063,7 @@ function minutesLabel(totalMinutes) {
 }
 
 function progressPercent(apiProgress, departure, arrival, now) {
-  const liveProgress = Number(apiProgress);
-  if (Number.isFinite(liveProgress)) {
-    return clamp(liveProgress, 0, 100);
-  }
-  if (!departure || !arrival || arrival <= departure) {
-    return 0;
-  }
-  return clamp(((now - departure.getTime()) / (arrival.getTime() - departure.getTime())) * 100, 0, 100);
+  return progressPercentHelper(apiProgress, departure, arrival, now);
 }
 
 function timelineText(departure, arrival, now) {
