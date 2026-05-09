@@ -6,12 +6,10 @@ New integration code should import from ``flight_tracker.parsers.ical`` and
 
 from __future__ import annotations
 
-from .parsers.ical import (
-    KLM_AIRLINE_CODE,
-    FlightEvent,
-    parse_flights,
-)
-from .parsers.roster import RosterEvent, parse_roster_events
+from .models.flight import FlightEvent
+from .models.roster import RosterEvent
+from .parsers.ical import KLM_AIRLINE_CODE, parse_flights
+from .parsers.roster import parse_roster_events
 
 __all__ = [
     "KLM_AIRLINE_CODE",

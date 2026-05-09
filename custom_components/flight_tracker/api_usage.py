@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import time
 from typing import Any
@@ -15,25 +14,13 @@ except ImportError:  # pragma: no cover - used by lightweight unit tests
 
 from .clients.afkl import AirFranceKlmRequestBlocked
 from .const import DOMAIN
-from .parsers.ical import FlightEvent
+from .models.api_usage import ApiUsageSnapshot
+from .models.flight import FlightEvent
 
 STORAGE_VERSION = 1
 DEFAULT_DAILY_REQUEST_LIMIT = 95
 MIN_REQUEST_INTERVAL_SECONDS = 1.1
 FLIGHT_ID_CACHE_TTL = timedelta(days=2)
-
-
-@dataclass(frozen=True)
-class ApiUsageSnapshot:
-    """Current AF-KLM request budget state."""
-
-    date: str
-    requests_today: int
-    daily_limit: int
-    remaining: int
-    exhausted: bool
-    cached_flight_ids: int
-    last_request_at: str | None = None
 
 
 class ApiUsageManager:

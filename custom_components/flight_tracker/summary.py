@@ -6,6 +6,7 @@ directly.
 
 from __future__ import annotations
 
-from .services.travel_status import TravelStatusSummary, build_travel_status
+from .models.travel_status import TravelStatusSummary
+from .services.travel_status import build_travel_status
 
 __all__ = ["TravelStatusSummary", "build_travel_status"]

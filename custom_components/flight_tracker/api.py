@@ -18,7 +18,8 @@ from .clients.afkl import (
     _numeric_flight_number,
     _operational_suffix,
 )
-from .parsers.afkl_status import FlightStatus, status_from_flight
+from .models.status import FlightStatus
+from .parsers.afkl_status import status_from_flight
 
 __all__ = [
     "AFKL_BASE_URL",

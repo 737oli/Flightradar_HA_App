@@ -6,8 +6,9 @@ from datetime import timezone
 from typing import Any, Awaitable, Callable, TYPE_CHECKING
 from urllib.parse import quote
 
-from ..parsers.afkl_status import FlightStatus, status_from_flight
-from ..parsers.ical import FlightEvent
+from ..models.flight import FlightEvent
+from ..models.status import FlightStatus
+from ..parsers.afkl_status import status_from_flight
 
 if TYPE_CHECKING:
     from aiohttp import ClientSession

@@ -14,8 +14,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import ATTR_FLIGHTS, DOMAIN
 from .coordinator import FlightTrackerCoordinator
 from .entity import async_coordinator, compact_flight, flight_attributes
-from .services.travel_status import TravelStatusSummary, build_travel_status
-from .services.trip_timeline import TripTimelineSummary, build_trip_timeline
+from .models.travel_status import TravelStatusSummary
+from .models.trip_timeline import TripTimelineSummary
+from .services.travel_status import build_travel_status
+from .services.trip_timeline import build_trip_timeline
 
 SENSOR_DESCRIPTIONS = (
     SensorEntityDescription(

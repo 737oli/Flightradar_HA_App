@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import logging
 
@@ -14,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api_usage import ApiUsageManager, ApiUsageSnapshot
+from .api_usage import ApiUsageManager
 from .clients.afkl import AirFranceKlmClient, AirFranceKlmRequestBlocked
 from .clients.calendar import IcalCalendarClient
 from .const import (
@@ -24,33 +23,17 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
 )
-from .parsers.afkl_status import FlightStatus
-from .parsers.ical import FlightEvent, parse_flights
-from .parsers.roster import RosterEvent, parse_roster_events
+from .models.flight import FlightEvent
+from .models.roster import RosterEvent
+from .models.snapshot import FlightTrackerSnapshot
+from .models.status import FlightStatus
+from .parsers.ical import parse_flights
+from .parsers.roster import parse_roster_events
 
 _LOGGER = logging.getLogger(__name__)
 
 LIVE_TRACKING_BEFORE_DEPARTURE = timedelta(hours=1)
 LIVE_TRACKING_AFTER_ARRIVAL = timedelta(hours=1)
-
-
-@dataclass(frozen=True)
-class FlightTrackerSnapshot:
-    """Current integration data."""
-
-    flights: list[FlightEvent]
-    roster_events: list[RosterEvent]
-    current_flight: FlightEvent | None
-    next_flight: FlightEvent | None
-    statuses: dict[str, FlightStatus]
-    api_usage: ApiUsageSnapshot
-    last_refresh: datetime
-
-    def status_for(self, event: FlightEvent | None) -> FlightStatus | None:
-        """Return live status for a flight event."""
-        if event is None:
-            return None
-        return self.statuses.get(event.uid)
 
 
 class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):

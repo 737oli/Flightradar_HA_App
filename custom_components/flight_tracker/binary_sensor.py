@@ -17,7 +17,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import FlightTrackerCoordinator
 from .entity import async_coordinator
-from .services.travel_status import TravelStatusSummary, build_travel_status
+from .models.travel_status import TravelStatusSummary
+from .services.travel_status import build_travel_status
 
 BINARY_SENSOR_DESCRIPTIONS = (
     BinarySensorEntityDescription(
