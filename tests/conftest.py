@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 import sys
@@ -64,5 +65,5 @@ def homeassistant_stubs():
     dt = sys.modules.setdefault("homeassistant.util.dt", ModuleType("homeassistant.util.dt"))
     util = sys.modules.setdefault("homeassistant.util", ModuleType("homeassistant.util"))
     util.dt = dt
-    dt.now = lambda: None
-    dt.get_time_zone = lambda time_zone: None
+    dt.now = lambda: datetime.now(timezone.utc)
+    dt.get_time_zone = lambda time_zone: timezone.utc
