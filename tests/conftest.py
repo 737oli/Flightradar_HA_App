@@ -25,6 +25,10 @@ _bootstrap_custom_component_package()
 
 @pytest.fixture
 def homeassistant_stubs():
+    _install_homeassistant_stubs()
+
+
+def _install_homeassistant_stubs() -> None:
     aiohttp = sys.modules.setdefault("aiohttp", ModuleType("aiohttp"))
     aiohttp.ClientError = Exception
     aiohttp.ClientResponseError = Exception
@@ -67,3 +71,6 @@ def homeassistant_stubs():
     util.dt = dt
     dt.now = lambda: datetime.now(timezone.utc)
     dt.get_time_zone = lambda time_zone: timezone.utc
+
+
+_install_homeassistant_stubs()
