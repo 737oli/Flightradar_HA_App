@@ -20,7 +20,6 @@ from .calendar import FlightEvent, RosterEvent, parse_flights, parse_roster_even
 from .const import (
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
-    DEFAULT_CONSUMER_HOST,
     DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
@@ -146,7 +145,6 @@ class FlightTrackerCoordinator(DataUpdateCoordinator[FlightTrackerSnapshot]):
         client = AirFranceKlmClient(
             self._session,
             api_key,
-            DEFAULT_CONSUMER_HOST,
             request_guard=request_guard,
         )
         statuses: dict[str, FlightStatus] = {}

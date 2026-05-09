@@ -14,8 +14,13 @@ custom_components = sys.modules.setdefault(
 flight_tracker = sys.modules.setdefault(
     "custom_components.flight_tracker", ModuleType("custom_components.flight_tracker")
 )
+parsers = sys.modules.setdefault(
+    "custom_components.flight_tracker.parsers",
+    ModuleType("custom_components.flight_tracker.parsers"),
+)
 custom_components.__path__ = [str(ROOT / "custom_components")]
 flight_tracker.__path__ = [str(PACKAGE_PATH)]
+parsers.__path__ = [str(PACKAGE_PATH / "parsers")]
 
 
 def load_module(name, path):
@@ -30,12 +35,16 @@ def load_module(name, path):
 calendar_module = load_module(
     "custom_components.flight_tracker.calendar", PACKAGE_PATH / "calendar.py"
 )
+afkl_status_module = load_module(
+    "custom_components.flight_tracker.parsers.afkl_status",
+    PACKAGE_PATH / "parsers" / "afkl_status.py",
+)
 api_module = load_module("custom_components.flight_tracker.api", PACKAGE_PATH / "api.py")
 
 FlightEvent = calendar_module.FlightEvent
 _numeric_flight_number = api_module._numeric_flight_number
 _flight_status_id = api_module._flight_status_id
-_status_from_flight = api_module._status_from_flight
+status_from_flight = afkl_status_module.status_from_flight
 AirFranceKlmClient = api_module.AirFranceKlmClient
 AFKL_BASE_URL = api_module.AFKL_BASE_URL
 
@@ -159,7 +168,7 @@ def test_status_from_afkl_flight_maps_live_attributes():
         ],
     }
 
-    status = _status_from_flight(event, flight)
+    status = status_from_flight(event, flight)
 
     assert status.source == "airfranceklm"
     assert status.provider_flight_id == "20260506+KL+1327"
@@ -222,7 +231,7 @@ def test_status_prefers_latest_public_arrival_eta_for_delay():
         ],
     }
 
-    status = _status_from_flight(event, flight)
+    status = status_from_flight(event, flight)
 
     assert status.estimated_arrival == datetime(
         2026, 5, 7, 14, 17, tzinfo=timezone.utc
@@ -266,7 +275,7 @@ def test_status_uses_arrival_irregularity_delay_when_eta_is_stale():
         ],
     }
 
-    status = _status_from_flight(event, flight)
+    status = status_from_flight(event, flight)
 
     assert status.arrival_delay_minutes == 18
     assert status.delay_duration_arrival == "PT18M"
@@ -302,7 +311,7 @@ def test_status_derives_arrival_eta_from_time_to_arrival():
         ],
     }
 
-    status = _status_from_flight(
+    status = status_from_flight(
         event,
         flight,
         observed_at=datetime(2026, 5, 7, 13, 40, tzinfo=timezone.utc),
@@ -352,7 +361,7 @@ def test_afkl_client_uses_direct_flight_status_endpoint_and_api_key_header():
     )
 
     status = asyncio.run(
-        AirFranceKlmClient(session, "secret-key", "AF").async_get_status(event)
+        AirFranceKlmClient(session, "secret-key").async_get_status(event)
     )
 
     assert status.provider_flight_id == "20260506+KL+0643"
@@ -381,7 +390,7 @@ def test_afkl_client_ignores_non_kl_events():
     session = FakeSession([])
 
     status = asyncio.run(
-        AirFranceKlmClient(session, "secret-key", "AF").async_get_status(event)
+        AirFranceKlmClient(session, "secret-key").async_get_status(event)
     )
 
     assert status is None

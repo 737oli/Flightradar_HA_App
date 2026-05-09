@@ -12,10 +12,8 @@ from homeassistant.const import CONF_API_KEY, CONF_NAME, CONF_URL
 from homeassistant.core import callback
 
 from .const import (
-    CONF_CONSUMER_HOST,
     CONF_LOOKAHEAD_DAYS,
     CONF_UPDATE_INTERVAL,
-    DEFAULT_CONSUMER_HOST,
     DEFAULT_LOOKAHEAD_DAYS,
     DEFAULT_NAME,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
@@ -138,7 +136,6 @@ def _entry_data(user_input: dict[str, Any]) -> dict[str, Any]:
         or DEFAULT_NAME,
         CONF_URL: str(user_input[CONF_URL]).strip(),
         CONF_API_KEY: str(user_input[CONF_API_KEY]).strip(),
-        CONF_CONSUMER_HOST: DEFAULT_CONSUMER_HOST,
         CONF_LOOKAHEAD_DAYS: user_input.get(
             CONF_LOOKAHEAD_DAYS, DEFAULT_LOOKAHEAD_DAYS
         ),
