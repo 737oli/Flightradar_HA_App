@@ -71,7 +71,7 @@ The integration serves a no-build Lovelace card that is styled after the compact
 Add this dashboard resource:
 
 ```text
-/flight_tracker_static/flight-tracker-card.js?v=0.5.0
+/flight_tracker_static/flight-tracker-card.js?v=0.6.3
 ```
 
 Resource type:
@@ -239,3 +239,7 @@ Run frontend helper tests:
 ```bash
 node --test custom_components/flight_tracker/frontend/flight-tracker-card-helpers.test.mjs
 ```
+
+Release checklist:
+
+- Keep `custom_components/flight_tracker/manifest.json` `version`, frontend `CARD_VERSION` (`custom_components/flight_tracker/frontend/flight-tracker-card.js`), and the dashboard resource cache-busting query (`flight-tracker-card.js?v=...`) aligned to the same release value.
