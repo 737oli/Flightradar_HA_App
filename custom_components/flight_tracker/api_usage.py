@@ -1,4 +1,10 @@
-"""Compatibility exports for API usage storage."""
+"""Deprecated compatibility exports for API usage storage.
+
+These root-level imports are kept temporarily for older local consumers and are
+planned for removal in v0.7.0. New integration code should import from
+``flight_tracker.models.api_usage`` and ``flight_tracker.storage.api_usage``
+directly.
+"""
 
 from __future__ import annotations
 

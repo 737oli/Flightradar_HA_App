@@ -1,6 +1,8 @@
-"""Compatibility exports for Air France-KLM API code.
+"""Deprecated compatibility exports for Air France-KLM API code.
 
-New integration code should import from ``flight_tracker.clients.afkl`` and
+These root-level imports are kept temporarily for older local consumers and are
+planned for removal in v0.7.0. New integration code should import from
+``flight_tracker.clients.afkl``, ``flight_tracker.models.status``, and
 ``flight_tracker.parsers.afkl_status`` directly.
 """
 

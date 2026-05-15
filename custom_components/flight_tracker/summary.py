@@ -1,7 +1,9 @@
-"""Compatibility exports for travel status services.
+"""Deprecated compatibility exports for travel status services.
 
-New integration code should import from ``flight_tracker.services.travel_status``
-directly.
+These root-level imports are kept temporarily for older local consumers and are
+planned for removal in v0.7.0. New integration code should import from
+``flight_tracker.models.travel_status`` and
+``flight_tracker.services.travel_status`` directly.
 """
 
 from __future__ import annotations

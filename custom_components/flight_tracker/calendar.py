@@ -1,7 +1,9 @@
-"""Compatibility exports for iCal parsing.
+"""Deprecated compatibility exports for iCal parsing.
 
-New integration code should import from ``flight_tracker.parsers.ical`` and
-``flight_tracker.parsers.roster`` directly.
+These root-level imports are kept temporarily for older local consumers and are
+planned for removal in v0.7.0. New integration code should import from
+``flight_tracker.models.flight``, ``flight_tracker.models.roster``,
+``flight_tracker.parsers.ical``, and ``flight_tracker.parsers.roster`` directly.
 """
 
 from __future__ import annotations
