@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  airportStatus,
+  airportDetail,
   durationLabel,
   isFlightState,
   routePart,
@@ -37,9 +37,14 @@ test("timelineText switches phase around departure and arrival", () => {
   });
 });
 
-test("airportStatus and routePart preserve display formatting", () => {
+test("airportDetail prefers stand and falls back to gate", () => {
+  assert.equal(airportDetail("B06", "D12"), "Stand B06");
+  assert.equal(airportDetail(undefined, "D12"), "Gate D12");
+  assert.equal(airportDetail(undefined, undefined), "");
+});
+
+test("routePart preserves display formatting", () => {
   assert.equal(routePart("AMS -> JFK", 1), "JFK");
-  assert.equal(airportStatus("3", "D12", "On Time"), "T3 · Gate D12 · On Time");
 });
 
 test("durationLabel rounds to whole minutes", () => {

@@ -40,8 +40,10 @@ def status_from_flight(
         arrival_delay_minutes=time_data["arrival_delay_minutes"],
         departure_terminal=places_data["departure_terminal"],
         departure_gate=places_data["departure_gate"],
+        departure_parking_position=places_data["departure_parking_position"],
         arrival_terminal=places_data["arrival_terminal"],
         arrival_gate=places_data["arrival_gate"],
+        arrival_parking_position=places_data["arrival_parking_position"],
         aircraft_registration=aircraft_data["aircraft_registration"],
         aircraft_type=aircraft_data["aircraft_type"],
         delay_code=irregularity_data["delay_code"],
@@ -137,12 +139,18 @@ def _extract_place_data(leg: dict[str, Any]) -> dict[str, str | None]:
             departure_places.get("boardingTerminal"),
         ),
         "departure_gate": _first_list_item(departure_places.get("gateNumber")),
+        "departure_parking_position": _first_string(
+            departure_places.get("parkingPosition")
+        ),
         "arrival_terminal": _first_string(
             arrival_places.get("terminalCode"),
             arrival_places.get("arrivalTerminal"),
             arrival_places.get("arrivalPositionTerminal"),
         ),
         "arrival_gate": _first_list_item(arrival_places.get("gateNumber")),
+        "arrival_parking_position": _first_string(
+            arrival_places.get("parkingPosition")
+        ),
     }
 
 

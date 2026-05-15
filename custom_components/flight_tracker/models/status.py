@@ -22,8 +22,10 @@ class FlightStatus:
     arrival_delay_minutes: int | None = None
     departure_terminal: str | None = None
     departure_gate: str | None = None
+    departure_parking_position: str | None = None
     arrival_terminal: str | None = None
     arrival_gate: str | None = None
+    arrival_parking_position: str | None = None
     aircraft_registration: str | None = None
     aircraft_type: str | None = None
     delay_code: str | None = None

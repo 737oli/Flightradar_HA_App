@@ -27,14 +27,6 @@ export function formatTime(date) {
     .replace(/\s/g, "");
 }
 
-export function statusText(delay) {
-  const value = Number(delay);
-  if (!Number.isFinite(value) || Math.abs(value) <= 5) {
-    return "On Time";
-  }
-  return value > 0 ? `${value}m Late` : `${Math.abs(value)}m Early`;
-}
-
 export function delayTone(delay) {
   return isDelayed(delay) ? "delayed" : "on-time";
 }
@@ -44,16 +36,14 @@ export function isDelayed(delay) {
   return Number.isFinite(value) && value > 5;
 }
 
-export function airportStatus(terminal, gate, status) {
-  const parts = [];
-  if (terminal) {
-    parts.push(String(terminal).startsWith("T") ? terminal : `T${terminal}`);
+export function airportDetail(parkingPosition, gate) {
+  if (parkingPosition) {
+    return `Stand ${parkingPosition}`;
   }
   if (gate) {
-    parts.push(`Gate ${gate}`);
+    return `Gate ${gate}`;
   }
-  parts.push(status);
-  return parts.join(" · ");
+  return "";
 }
 
 export function timelineText(departure, arrival, now) {

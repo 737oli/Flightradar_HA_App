@@ -15,24 +15,47 @@ export function timeDeltaLabel(deltaMinutes) {
   return `<em class="timeline-time-delta ${tone}">${sign}${minutes}m</em>`;
 }
 
+export function flightTimeDeltaLabel(deltaMinutes) {
+  const minutes = Number(deltaMinutes);
+  if (!Number.isFinite(minutes) || Math.abs(minutes) <= 5) {
+    return "";
+  }
+  const roundedMinutes = Math.round(minutes);
+  const tone = roundedMinutes > 0 ? "is-late" : "is-early";
+  const sign = roundedMinutes > 0 ? "+" : "";
+  return `<sup class="flight-time-delta ${tone}">${sign}${roundedMinutes}</sup>`;
+}
+
 export function irregularityText(attrs = {}) {
-  const code = firstValue(
-    attrs.irregularity_delay_code,
-    attrs.irregularity_delay_reason_code_public,
-    attrs.irregularity_delay_sub_code,
-  );
+  const code = delayCode(attrs);
   const duration =
     formatDelayDuration(
       firstValue(
         attrs.irregularity_delay_duration_public,
         attrs.irregularity_delay_duration,
+        attrs.irregularity_delay_duration_arrival,
       ),
     ) || delayDurationFromMinutes(attrs.departure_delay_minutes, attrs.arrival_delay_minutes);
-  const reason = firstValue(
-    attrs.irregularity_delay_reason_public,
-    attrs.irregularity_public_disruption_reason,
-    attrs.irregularity_delay_reason,
-  );
+  const reason = compactDelayReason(delayReason(attrs));
+
+  if (!code && !duration && !reason) {
+    return "";
+  }
+
+  return [duration, reason, code].filter(Boolean).join(" · ");
+}
+
+export function irregularityTitle(attrs = {}) {
+  const code = delayCode(attrs);
+  const duration =
+    formatDelayDuration(
+      firstValue(
+        attrs.irregularity_delay_duration_public,
+        attrs.irregularity_delay_duration,
+        attrs.irregularity_delay_duration_arrival,
+      ),
+    ) || delayDurationFromMinutes(attrs.departure_delay_minutes, attrs.arrival_delay_minutes);
+  const reason = delayReason(attrs);
 
   if (!code && !duration && !reason) {
     return "";
@@ -77,6 +100,47 @@ export function timelineStatusHtml(status) {
 
 function firstValue(...values) {
   return values.find((value) => value !== undefined && value !== null && String(value).trim());
+}
+
+function delayCode(attrs = {}) {
+  const code = firstValue(attrs.irregularity_delay_code);
+  const subCode = firstValue(attrs.irregularity_delay_sub_code);
+  if (code && subCode && !String(code).endsWith(String(subCode))) {
+    return `${code}${subCode}`;
+  }
+  return firstValue(code, attrs.irregularity_delay_reason_code_public, subCode);
+}
+
+function delayReason(attrs = {}) {
+  return firstValue(
+    attrs.irregularity_delay_reason_public,
+    attrs.irregularity_public_disruption_reason,
+    attrs.irregularity_delay_reason,
+  );
+}
+
+function compactDelayReason(value) {
+  if (!value) {
+    return "";
+  }
+  const text = String(value).replace(/\s+/g, " ").trim();
+  const lowered = text.toLowerCase();
+  if (lowered.includes("air traffic control") || lowered.includes("air traffic")) {
+    return lowered.includes("restriction") ? "ATC restrictions" : "ATC";
+  }
+  if (lowered.includes("late inbound") || lowered.includes("previous flight")) {
+    return "Late inbound aircraft";
+  }
+  if (lowered.includes("weather")) {
+    return "Weather";
+  }
+  if (lowered.includes("crew")) {
+    return "Crew";
+  }
+  if (text.length <= 28) {
+    return text;
+  }
+  return `${text.slice(0, 25).trimEnd()}...`;
 }
 
 function formatDelayDuration(value) {

@@ -1,6 +1,11 @@
-import { irregularityText, progressPercent } from "./flight-tracker-card-helpers.js";
 import {
-  airportStatus,
+  flightTimeDeltaLabel,
+  irregularityText,
+  irregularityTitle,
+  progressPercent,
+} from "./flight-tracker-card-helpers.js";
+import {
+  airportDetail,
   delayTone,
   flightPrefix,
   formatTime,
@@ -9,7 +14,6 @@ import {
   isFlightState,
   parseDate,
   routePart,
-  statusText,
   timelineText,
 } from "./flight-tracker-card-formatters.js";
 
@@ -31,16 +35,16 @@ export function renderFlightCard(state, now = Date.now()) {
     scheduledArrival;
   const progress = progressPercent(attrs.progress_percent, departure, arrival, now);
   const timeline = timelineText(departure, arrival, now);
-  const departureStatus = airportStatus(
-    attrs.departure_terminal,
+  const departureDetail = airportDetail(
+    attrs.departure_parking_position,
     attrs.departure_gate,
-    statusText(attrs.departure_delay_minutes),
   );
-  const arrivalStatus = airportStatus(
-    attrs.arrival_terminal,
+  const arrivalDetail = airportDetail(
+    attrs.arrival_parking_position,
     attrs.arrival_gate,
-    statusText(attrs.arrival_delay_minutes),
   );
+  const departureTime = scheduledDeparture || departure;
+  const arrivalTime = scheduledArrival || arrival;
   const airline = attrs.airline_code || flightPrefix(attrs.flight_number) || "";
   const flightNumber = attrs.flight_number || state.state || "Flight";
   const departureAirport = attrs.departure_airport || routePart(attrs.route, 0) || "---";
@@ -51,6 +55,7 @@ export function renderFlightCard(state, now = Date.now()) {
   const liveStatus = attrs.live_status || (attrs.is_deadhead ? "Positioning" : "On roster");
   const rightLabel = [registration, liveStatus].filter(Boolean).join(" · ");
   const irregularity = irregularityText(attrs);
+  const irregularityFullText = irregularityTitle(attrs);
   const delayClass =
     isDelayed(attrs.departure_delay_minutes) || isDelayed(attrs.arrival_delay_minutes)
       ? "is-delayed"
@@ -74,9 +79,12 @@ export function renderFlightCard(state, now = Date.now()) {
           <div class="airport origin ${delayTone(attrs.departure_delay_minutes)}">
             <div>
               <strong>${escapeHtml(departureAirport)}</strong>
-              <span>${formatTime(departure)}</span>
+              <span class="time">
+                ${escapeHtml(formatTime(departureTime))}
+                ${flightTimeDeltaLabel(attrs.departure_delay_minutes)}
+              </span>
             </div>
-            <small>${escapeHtml(departureStatus)}</small>
+            <small>${escapeHtml(departureDetail)}</small>
           </div>
 
           <div class="plane-line" aria-hidden="true">
@@ -87,10 +95,13 @@ export function renderFlightCard(state, now = Date.now()) {
 
           <div class="airport destination ${delayTone(attrs.arrival_delay_minutes)}">
             <div>
-              <span>${formatTime(arrival)}</span>
+              <span class="time">
+                ${escapeHtml(formatTime(arrivalTime))}
+                ${flightTimeDeltaLabel(attrs.arrival_delay_minutes)}
+              </span>
               <strong>${escapeHtml(arrivalAirport)}</strong>
             </div>
-            <small>${escapeHtml(arrivalStatus)}</small>
+            <small>${escapeHtml(arrivalDetail)}</small>
           </div>
         </section>
 
@@ -106,7 +117,7 @@ export function renderFlightCard(state, now = Date.now()) {
 
         ${
           irregularity
-            ? `<section class="irregularity"><b>Delay</b><span>${escapeHtml(irregularity)}</span></section>`
+            ? `<section class="irregularity" title="${escapeHtml(irregularityFullText || irregularity)}"><b>Delay</b><span>${escapeHtml(irregularity)}</span></section>`
             : ""
         }
       </article>
@@ -254,12 +265,31 @@ function styles() {
         font-weight: 800;
       }
 
-      .airport span {
+      .airport .time {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 3px;
         color: var(--flight-card-green);
         font-size: 30px;
         line-height: 1;
         font-weight: 700;
         white-space: nowrap;
+      }
+
+      .flight-time-delta {
+        color: var(--flight-card-green);
+        font-size: 12px;
+        line-height: 1;
+        font-weight: 800;
+        transform: translateY(-0.42em);
+      }
+
+      .flight-time-delta.is-late {
+        color: var(--flight-card-red);
+      }
+
+      .flight-time-delta.is-early {
+        color: var(--flight-card-green);
       }
 
       .airport small {
@@ -273,7 +303,7 @@ function styles() {
         white-space: nowrap;
       }
 
-      .airport.delayed span,
+      .airport.delayed .time,
       .airport.delayed small {
         color: var(--flight-card-red);
       }
@@ -406,8 +436,12 @@ function styles() {
           font-size: 27px;
         }
 
-        .airport span {
+        .airport .time {
           font-size: 22px;
+        }
+
+        .flight-time-delta {
+          font-size: 10px;
         }
 
         .airport small {

@@ -114,6 +114,7 @@ def test_status_from_afkl_flight_maps_live_attributes():
                         "places": {
                             "terminalCode": "1",
                             "gateNumber": ["A10"],
+                            "parkingPosition": "B06",
                         }
                     },
                     "times": {
@@ -127,6 +128,7 @@ def test_status_from_afkl_flight_maps_live_attributes():
                         "places": {
                             "terminalCode": "2",
                             "gateNumber": ["B04"],
+                            "parkingPosition": "44",
                         }
                     },
                     "times": {
@@ -174,8 +176,10 @@ def test_status_from_afkl_flight_maps_live_attributes():
     assert status.arrival_delay_minutes == -5
     assert status.departure_terminal == "1"
     assert status.departure_gate == "A10"
+    assert status.departure_parking_position == "B06"
     assert status.arrival_terminal == "2"
     assert status.arrival_gate == "B04"
+    assert status.arrival_parking_position == "44"
     assert status.aircraft_registration == "PH-EXA"
     assert status.aircraft_type == "E75"
     assert status.delay_code == "81"
@@ -343,8 +347,68 @@ def test_status_handles_missing_nested_objects_without_crashing():
     assert status.estimated_arrival is None
     assert status.departure_terminal is None
     assert status.arrival_gate is None
+    assert status.departure_parking_position is None
+    assert status.arrival_parking_position is None
     assert status.delay_reason_public is None
     assert status.latitude is None
+
+
+def test_flight_attributes_expose_parking_positions(homeassistant_stubs):
+    from custom_components.flight_tracker.entity import flight_attributes
+
+    event = FlightEvent(
+        uid="flight-attributes",
+        summary="KL1937 AMS-GVA",
+        description="",
+        location="",
+        start=datetime(2026, 5, 8, 15, 5, tzinfo=timezone.utc),
+        end=datetime(2026, 5, 8, 16, 35, tzinfo=timezone.utc),
+        flight_number="KL1937",
+        airline_code="KL",
+        departure_airport="AMS",
+        arrival_airport="GVA",
+        aircraft_type="E90",
+        is_deadhead=False,
+    )
+    status = status_from_flight(
+        event,
+        {
+            "id": "20260508+KL+1937",
+            "flightLegs": [
+                {
+                    "departureInformation": {
+                        "airport": {
+                            "places": {
+                                "gateNumber": ["B06"],
+                                "parkingPosition": "B06",
+                            }
+                        },
+                        "times": {"scheduled": "2026-05-08T15:05:00Z"},
+                    },
+                    "arrivalInformation": {
+                        "airport": {
+                            "places": {
+                                "gateNumber": ["A4"],
+                                "parkingPosition": "44",
+                            }
+                        },
+                        "times": {"scheduled": "2026-05-08T16:35:00Z"},
+                    },
+                }
+            ],
+        },
+    )
+
+    attrs = flight_attributes(
+        event,
+        status,
+        datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert attrs["departure_parking_position"] == "B06"
+    assert attrs["arrival_parking_position"] == "44"
+    assert attrs["departure_gate"] == "B06"
+    assert attrs["arrival_gate"] == "A4"
 
 
 def test_status_extracts_irregularity_from_direct_fields():

@@ -206,7 +206,7 @@ Relevant endpoints:
 
 The integration builds the AF-KLM `flightId` directly from the roster flight using the documented format `yyyyMMdd+KL+dddd`, where the date is the UTC scheduled departure date and the flight number is four digits long. For example, `KL1327` on May 6, 2026 becomes `20260506+KL+1327`. The integration sends your API key in the `API-Key` header and always uses `KL` as the travel host.
 
-Live attributes include actual/estimated departure and arrival times, terminal/gate, aircraft registration, `typeCode`, and AF-KLM irregularity details such as delay duration, delay reason, and delay code. The bundled card treats delays of 5 minutes or less as on time and marks later positive delays in red.
+Live attributes include actual/estimated departure and arrival times, terminal/gate, parking position, aircraft registration, `typeCode`, and AF-KLM irregularity details such as delay duration, delay reason, and delay code. The bundled card treats delays of 5 minutes or less as on time and marks later positive delays in red.
 
 ### API Budget Protection
 
