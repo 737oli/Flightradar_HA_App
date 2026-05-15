@@ -24,40 +24,47 @@ _bootstrap_custom_component_package()
 
 
 @pytest.fixture
-def homeassistant_stubs():
-    _install_homeassistant_stubs()
+def homeassistant_stubs(monkeypatch):
+    """Install lightweight Home Assistant imports for tests that request them."""
+    _install_homeassistant_stubs(monkeypatch)
 
 
-def _install_homeassistant_stubs() -> None:
-    aiohttp = sys.modules.setdefault("aiohttp", ModuleType("aiohttp"))
+def _install_homeassistant_stubs(monkeypatch) -> None:
+    aiohttp = ModuleType("aiohttp")
+    aiohttp.__flight_tracker_test_stub__ = True
     aiohttp.ClientError = Exception
     aiohttp.ClientResponseError = Exception
     aiohttp.ClientSession = object
+    monkeypatch.setitem(sys.modules, "aiohttp", aiohttp)
 
-    homeassistant = sys.modules.setdefault("homeassistant", ModuleType("homeassistant"))
+    homeassistant = ModuleType("homeassistant")
+    homeassistant.__flight_tracker_test_stub__ = True
     homeassistant.__path__ = []
+    monkeypatch.setitem(sys.modules, "homeassistant", homeassistant)
 
-    helpers = sys.modules.setdefault(
-        "homeassistant.helpers", ModuleType("homeassistant.helpers")
-    )
+    helpers = ModuleType("homeassistant.helpers")
+    helpers.__flight_tracker_test_stub__ = True
     helpers.__path__ = []
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers", helpers)
 
-    config_entries = sys.modules.setdefault(
-        "homeassistant.config_entries", ModuleType("homeassistant.config_entries")
-    )
+    config_entries = ModuleType("homeassistant.config_entries")
+    config_entries.__flight_tracker_test_stub__ = True
     config_entries.ConfigEntry = object
+    monkeypatch.setitem(sys.modules, "homeassistant.config_entries", config_entries)
 
-    const = sys.modules.setdefault("homeassistant.const", ModuleType("homeassistant.const"))
+    const = ModuleType("homeassistant.const")
+    const.__flight_tracker_test_stub__ = True
     const.CONF_API_KEY = "api_key"
     const.CONF_URL = "url"
+    monkeypatch.setitem(sys.modules, "homeassistant.const", const)
 
-    core = sys.modules.setdefault("homeassistant.core", ModuleType("homeassistant.core"))
+    core = ModuleType("homeassistant.core")
+    core.__flight_tracker_test_stub__ = True
     core.HomeAssistant = object
+    monkeypatch.setitem(sys.modules, "homeassistant.core", core)
 
-    update_coordinator = sys.modules.setdefault(
-        "homeassistant.helpers.update_coordinator",
-        ModuleType("homeassistant.helpers.update_coordinator"),
-    )
+    update_coordinator = ModuleType("homeassistant.helpers.update_coordinator")
+    update_coordinator.__flight_tracker_test_stub__ = True
 
     class DataUpdateCoordinator:
         def __class_getitem__(cls, item):
@@ -65,12 +72,18 @@ def _install_homeassistant_stubs() -> None:
 
     update_coordinator.DataUpdateCoordinator = DataUpdateCoordinator
     update_coordinator.UpdateFailed = Exception
+    monkeypatch.setitem(
+        sys.modules,
+        "homeassistant.helpers.update_coordinator",
+        update_coordinator,
+    )
 
-    dt = sys.modules.setdefault("homeassistant.util.dt", ModuleType("homeassistant.util.dt"))
-    util = sys.modules.setdefault("homeassistant.util", ModuleType("homeassistant.util"))
+    dt = ModuleType("homeassistant.util.dt")
+    dt.__flight_tracker_test_stub__ = True
+    util = ModuleType("homeassistant.util")
+    util.__flight_tracker_test_stub__ = True
     util.dt = dt
     dt.now = lambda: datetime.now(timezone.utc)
     dt.get_time_zone = lambda time_zone: timezone.utc
-
-
-_install_homeassistant_stubs()
+    monkeypatch.setitem(sys.modules, "homeassistant.util", util)
+    monkeypatch.setitem(sys.modules, "homeassistant.util.dt", dt)

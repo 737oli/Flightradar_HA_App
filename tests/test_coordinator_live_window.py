@@ -1,9 +1,16 @@
 from datetime import datetime, timedelta, timezone
-from custom_components.flight_tracker.coordinator import _current_flight, _live_candidates
+
 from custom_components.flight_tracker.models.flight import FlightEvent
 
 
-def test_live_data_window_is_one_hour_before_until_one_hour_after_flight():
+def test_live_data_window_is_one_hour_before_until_one_hour_after_flight(
+    homeassistant_stubs,
+):
+    from custom_components.flight_tracker.coordinator import (
+        _current_flight,
+        _live_candidates,
+    )
+
     flight = FlightEvent(
         uid="flight-1",
         summary="KL1327 AMS-KRK",

@@ -104,4 +104,3 @@ def _extract_route(text: str) -> tuple[str | None, str | None]:
     if not match:
         return None, None
     return match.group(1).upper(), match.group(2).upper()
-

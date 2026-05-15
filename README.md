@@ -71,7 +71,7 @@ The integration serves a no-build Lovelace card that is styled after the compact
 Add this dashboard resource:
 
 ```text
-/flight_tracker_static/flight-tracker-card.js?v=0.6.3
+/flight_tracker_static/flight-tracker-card.js?v=0.6.4
 ```
 
 Resource type:
@@ -234,12 +234,13 @@ Run tests:
 python3 -m pytest
 ```
 
-Run frontend helper tests:
+Run frontend tests:
 
 ```bash
-node --test custom_components/flight_tracker/frontend/flight-tracker-card-helpers.test.mjs
+node --test custom_components/flight_tracker/frontend/*.test.mjs
 ```
 
 Release checklist:
 
 - Keep `custom_components/flight_tracker/manifest.json` `version`, frontend `CARD_VERSION` (`custom_components/flight_tracker/frontend/flight-tracker-card.js`), and the dashboard resource cache-busting query (`flight-tracker-card.js?v=...`) aligned to the same release value.
+- Create the release tag from the commit that contains those aligned values, then verify `git rev-list -n 1 vX.Y.Z` matches the intended release commit before publishing the GitHub release.
