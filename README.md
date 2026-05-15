@@ -71,7 +71,7 @@ The integration serves a no-build Lovelace card that is styled after the compact
 Add this dashboard resource:
 
 ```text
-/flight_tracker_static/flight-tracker-card.js?v=0.6.4
+/flight_tracker_static/flight-tracker-card.js?v=0.7.0
 ```
 
 Resource type:
@@ -219,6 +219,18 @@ The integration protects the Air France-KLM limits by default:
 - When the daily budget is exhausted, the integration keeps calendar/timeline entities working and stops live enrichment until the next local day.
 
 Monitor the budget with `sensor.<name>_api_requests_today`, `sensor.<name>_api_requests_remaining`, and `binary_sensor.<name>_api_budget_exhausted`.
+
+## Compatibility Migration For 0.7.0
+
+Version `0.7.0` removes the old root compatibility modules. Internal code already uses the architecture-owned modules directly, and new code should use these imports too:
+
+| Removed import path | Use instead |
+| --- | --- |
+| `custom_components.flight_tracker.api` | `custom_components.flight_tracker.clients.afkl`, `custom_components.flight_tracker.models.status`, `custom_components.flight_tracker.parsers.afkl_status` |
+| `custom_components.flight_tracker.api_usage` | `custom_components.flight_tracker.models.api_usage`, `custom_components.flight_tracker.storage.api_usage` |
+| `custom_components.flight_tracker.calendar` | `custom_components.flight_tracker.models.flight`, `custom_components.flight_tracker.models.roster`, `custom_components.flight_tracker.parsers.ical`, `custom_components.flight_tracker.parsers.roster` |
+| `custom_components.flight_tracker.summary` | `custom_components.flight_tracker.models.travel_status`, `custom_components.flight_tracker.services.travel_status` |
+| `custom_components.flight_tracker.timeline` | `custom_components.flight_tracker.models.trip_timeline`, `custom_components.flight_tracker.services.trip_timeline` |
 
 ## Development
 
