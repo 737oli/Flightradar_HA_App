@@ -2,7 +2,7 @@ import { isFlightState } from "./flight-tracker-card-formatters.js";
 import { renderFlightCard } from "./flight-tracker-flight-card-render.js";
 import { renderTimelineCard } from "./flight-tracker-timeline-card-render.js";
 
-const CARD_VERSION = "0.7.0";
+const CARD_VERSION = "0.7.1";
 
 class FlightTrackerCard extends HTMLElement {
   constructor() {

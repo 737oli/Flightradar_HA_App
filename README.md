@@ -71,7 +71,7 @@ The integration serves a no-build Lovelace card that is styled after the compact
 Add this dashboard resource:
 
 ```text
-/flight_tracker_static/flight-tracker-card.js?v=0.7.0
+/flight_tracker_static/flight-tracker-card.js?v=0.7.1
 ```
 
 Resource type:
