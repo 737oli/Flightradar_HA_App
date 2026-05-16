@@ -148,7 +148,9 @@ def _segments_from_events(
     if base_return:
         segments.append(base_return)
 
-    return sorted(segments, key=lambda segment: (segment.start, segment.end))
+    # Roster rows define the travel-day order; live times only enrich displayed
+    # timing, otherwise delayed flights can jump below their turnaround rows.
+    return segments
 
 
 def _segment_from_event(
@@ -192,7 +194,7 @@ def _segment_from_event(
         route=event.route,
         departure_airport=event.departure_airport,
         arrival_airport=event.arrival_airport,
-        aircraft_type=event.aircraft_type,
+        aircraft_type=_aircraft_type(event, status),
         is_deadhead=event.is_deadhead,
         url=event.url or None,
         scheduled_start=scheduled_start,
@@ -338,7 +340,7 @@ def _title_detail(
         prefix = f"DH/{event.flight_number}" if event.is_deadhead else event.flight_number
         detail_parts = [
             _display_route(event.route),
-            status.aircraft_type if status else event.aircraft_type,
+            _aircraft_type(event, status),
         ]
         return prefix or event.title, " · ".join(part for part in detail_parts if part)
     if event.kind == "hotel":
@@ -349,6 +351,13 @@ def _title_detail(
     if event.kind == "transfer":
         return event.title, ""
     return event.title, event.location
+
+
+def _aircraft_type(event: RosterEvent, status: FlightStatus | None) -> str | None:
+    """Return live aircraft type when available, otherwise roster aircraft type."""
+    if event.kind == "flight" and status and status.aircraft_type:
+        return status.aircraft_type
+    return event.aircraft_type
 
 
 def _status_label(

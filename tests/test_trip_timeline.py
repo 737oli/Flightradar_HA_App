@@ -143,6 +143,95 @@ END:VCALENDAR
     assert "status" not in timeline.segments[5]
 
 
+def test_trip_timeline_preserves_roster_order_when_live_times_shift():
+    events = parse_roster_events(
+        """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:duty-1
+DTSTART:20260509T123000Z
+DTEND:20260509T212500Z
+SUMMARY:Flight Day
+END:VEVENT
+BEGIN:VEVENT
+UID:taxi-1
+DTSTART:20260509T123000Z
+DTEND:20260509T130000Z
+SUMMARY:Taxi
+END:VEVENT
+BEGIN:VEVENT
+UID:flight-lju
+DTSTART:20260509T140000Z
+DTEND:20260509T155500Z
+SUMMARY:KL1990 LJU-AMS
+LOCATION:E190
+END:VEVENT
+BEGIN:VEVENT
+UID:ground-ams
+DTSTART:20260509T155500Z
+DTEND:20260509T170500Z
+SUMMARY:Grondtijd: 01:10
+LOCATION:Tijd tot lopen: 00:25 (16:20)
+END:VEVENT
+BEGIN:VEVENT
+UID:flight-gva-out
+DTSTART:20260509T170500Z
+DTEND:20260509T183500Z
+SUMMARY:KL1937 AMS-GVA
+LOCATION:E190
+END:VEVENT
+BEGIN:VEVENT
+UID:turn-gva
+DTSTART:20260509T183500Z
+DTEND:20260509T191500Z
+SUMMARY:Omdraai: 00:40
+END:VEVENT
+BEGIN:VEVENT
+UID:flight-gva-in
+DTSTART:20260509T191500Z
+DTEND:20260509T205500Z
+SUMMARY:KL1938 GVA-AMS
+LOCATION:E190
+END:VEVENT
+END:VCALENDAR
+""",
+        datetime(2026, 5, 9, 16, 10, tzinfo=timezone.utc),
+        timedelta(days=1),
+    )
+    statuses = {
+        "flight-gva-out": FlightStatus(
+            ident="KL1937",
+            source="airfranceklm",
+            actual_departure=datetime(2026, 5, 9, 18, 50, tzinfo=timezone.utc),
+            estimated_arrival=datetime(2026, 5, 9, 20, 5, tzinfo=timezone.utc),
+            departure_delay_minutes=105,
+            arrival_delay_minutes=90,
+            aircraft_type="E295",
+        )
+    }
+
+    timeline = build_trip_timeline(
+        events,
+        statuses,
+        datetime(2026, 5, 9, 16, 10, tzinfo=timezone.utc),
+    )
+
+    assert [segment["title"] for segment in timeline.segments] == [
+        "Taxi",
+        "KL1990",
+        "Grondtijd: 01:10",
+        "KL1937",
+        "Omdraai: 00:40",
+        "KL1938",
+        "Back at Amsterdam",
+    ]
+    delayed_flight = timeline.segments[3]
+    assert delayed_flight["flight_number"] == "KL1937"
+    assert delayed_flight["start"] == "2026-05-09T18:50:00+00:00"
+    assert delayed_flight["aircraft_type"] == "E295"
+    assert timeline.segments[5]["aircraft_type"] == "E190"
+
+
 def test_trip_timeline_exposes_live_time_deltas_for_flights():
     events = parse_roster_events(
         """BEGIN:VCALENDAR
@@ -185,6 +274,52 @@ END:VCALENDAR
     assert segment["departure_time_delta_minutes"] == 8
     assert segment["arrival_time_delta_minutes"] == -4
     assert segment["detail"] == "AMS - KRK · E195"
+
+
+def test_trip_timeline_prefers_live_aircraft_type_with_roster_fallback():
+    events = parse_roster_events(
+        """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:flight-live-type
+DTSTART:20260124T152000Z
+DTEND:20260124T171000Z
+SUMMARY:KL1327 AMS-KRK
+LOCATION:E190
+END:VEVENT
+BEGIN:VEVENT
+UID:flight-roster-type
+DTSTART:20260124T175500Z
+DTEND:20260124T195500Z
+SUMMARY:KL1328 KRK-AMS
+LOCATION:E195
+END:VEVENT
+END:VCALENDAR
+""",
+        datetime(2026, 1, 24, 18, 0, tzinfo=timezone.utc),
+        timedelta(days=1),
+    )
+
+    timeline = build_trip_timeline(
+        events,
+        {
+            "flight-live-type": FlightStatus(
+                ident="KL1327",
+                source="airfranceklm",
+                aircraft_type="E295",
+            ),
+            "flight-roster-type": FlightStatus(
+                ident="KL1328",
+                source="airfranceklm",
+            ),
+        },
+        datetime(2026, 1, 24, 18, 0, tzinfo=timezone.utc),
+    )
+
+    assert timeline.segments[0]["aircraft_type"] == "E295"
+    assert timeline.segments[0]["detail"] == "AMS - KRK · E295"
+    assert timeline.segments[2]["aircraft_type"] == "E195"
+    assert timeline.segments[2]["detail"] == "KRK - AMS · E195"
 
 
 def test_trip_timeline_adds_base_return_after_final_ams_arrival():
