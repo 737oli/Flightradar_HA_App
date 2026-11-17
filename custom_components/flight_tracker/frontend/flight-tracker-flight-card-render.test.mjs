@@ -88,3 +88,28 @@ test("flight card renders compact delay text with full hover title", () => {
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+test("flight card separates airport codes from times for narrow dashboard columns", () => {
+  const html = renderFlightCard({
+    state: "on_time",
+    attributes: {
+      flight_number: "KL1153",
+      departure_airport: "AMS",
+      arrival_airport: "TRD",
+      scheduled_departure: "2099-01-01T14:25:00Z",
+      scheduled_arrival: "2099-01-01T16:35:00Z",
+    },
+  });
+
+  // Destination airport must appear before the time, matching the origin layout.
+  assert.match(
+    html,
+    /<div class="airport destination[^"]*">[\s\S]*?<strong>TRD<\/strong>[\s\S]*?<span class="time">/,
+  );
+  // The card responds to its own width, not the browser viewport.
+  assert.match(html, /ha-card\s*\{[^}]*container-type:\s*inline-size/s);
+  assert.match(html, /\.airport > div\s*\{[^}]*flex-direction:\s*column/s);
+  assert.match(html, /@container \(max-width: 520px\)/);
+  assert.match(html, /@container \(max-width: 300px\)/);
+  assert.doesNotMatch(html, /@media \(max-width: 520px\)/);
+});
