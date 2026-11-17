@@ -95,11 +95,11 @@ export function renderFlightCard(state, now = Date.now()) {
 
           <div class="airport destination ${delayTone(attrs.arrival_delay_minutes)}">
             <div>
+              <strong>${escapeHtml(arrivalAirport)}</strong>
               <span class="time">
                 ${escapeHtml(formatTime(arrivalTime))}
                 ${flightTimeDeltaLabel(attrs.arrival_delay_minutes)}
               </span>
-              <strong>${escapeHtml(arrivalAirport)}</strong>
             </div>
             <small>${escapeHtml(arrivalDetail)}</small>
           </div>
@@ -137,6 +137,8 @@ function styles() {
       }
 
       ha-card {
+        display: block;
+        container-type: inline-size;
         background: transparent;
         box-shadow: none;
         border: 0;
@@ -233,8 +235,8 @@ function styles() {
 
       .route {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr);
-        align-items: center;
+        grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
+        align-items: start;
         gap: 14px;
         margin-top: 24px;
       }
@@ -249,13 +251,14 @@ function styles() {
 
       .airport > div {
         display: flex;
-        align-items: baseline;
-        gap: 8px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
         min-width: 0;
       }
 
       .destination > div {
-        justify-content: flex-end;
+        align-items: flex-end;
       }
 
       .airport strong {
@@ -263,6 +266,7 @@ function styles() {
         font-size: 32px;
         line-height: 1;
         font-weight: 800;
+        white-space: nowrap;
       }
 
       .airport .time {
@@ -313,6 +317,7 @@ function styles() {
         grid-template-columns: 1fr auto 1fr;
         align-items: center;
         gap: 8px;
+        margin-top: 4px;
         color: rgba(255, 255, 255, 0.42);
       }
 
@@ -419,7 +424,7 @@ function styles() {
         color: var(--flight-card-muted);
       }
 
-      @media (max-width: 520px) {
+      @container (max-width: 520px) {
         .flight-card {
           min-height: 172px;
           padding: 18px 18px 16px;
@@ -458,6 +463,33 @@ function styles() {
 
         .countdown strong {
           font-size: 27px;
+        }
+      }
+
+      @container (max-width: 300px) {
+        .flight-card {
+          padding: 16px 12px;
+        }
+
+        .route {
+          grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+          gap: 6px;
+        }
+
+        .airport strong {
+          font-size: 22px;
+        }
+
+        .airport .time {
+          font-size: 19px;
+        }
+
+        .plane-line {
+          gap: 2px;
+        }
+
+        .plane-line b {
+          font-size: 16px;
         }
       }
     </style>
